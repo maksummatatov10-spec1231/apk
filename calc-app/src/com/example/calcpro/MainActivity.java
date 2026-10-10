@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
@@ -27,30 +28,30 @@ public class MainActivity extends Activity {
 
     static final int SCREEN_CALC = 0;
     static final int SCREEN_EQUATIONS = 1;
-    static final int SCREEN_EXAMPLES = 2;
-    static final int SCREEN_HISTORY = 3;
-    static final int SCREEN_HELP = 4;
+    /** Страницы примеров идут подряд, начиная с этого индекса. */
+    static final int FIRST_PAGE = 2;
+    static final int SCREEN_HISTORY = FIRST_PAGE + Catalog.EXAMPLE_PAGES.length;
+    static final int SCREEN_HELP = SCREEN_HISTORY + 1;
+    static final int SCREEN_COUNT = SCREEN_HELP + 1;
 
-    private static final int[] TITLES = {
-        R.string.menu_calc, R.string.menu_equations, R.string.menu_examples, R.string.menu_history, R.string.menu_help,
-    };
-    private static final int[] ICONS = {
-        R.drawable.ic_calc, R.drawable.ic_equation, R.drawable.ic_examples, R.drawable.ic_history, R.drawable.ic_help,
-    };
+    private static final int PANEL_HEIGHT_DP = 360;
 
     private SideDrawer drawer;
     private HamburgerView hamburger;
     private TextView title;
     private FrameLayout screenHost;
-    private final View[] screens = new View[TITLES.length];
-    private final View[] navRows = new View[TITLES.length];
-    private final ImageView[] navIcons = new ImageView[TITLES.length];
-    private final TextView[] navLabels = new TextView[TITLES.length];
+    private final View[] screens = new View[SCREEN_COUNT];
+    private final View[] navRows = new View[SCREEN_COUNT];
+    private final ImageView[] navIcons = new ImageView[SCREEN_COUNT];
+    private final TextView[] navLabels = new TextView[SCREEN_COUNT];
     private int current = -1;
 
     private EditText input;
     private LinearLayout results;
     private ScrollView resultScroll;
+    private LinearLayout keypadBox;
+    private ImageView keypadToggle;
+    private boolean keypadOpen;
     private LinearLayout historyList;
     private TextView historyEmpty;
 
@@ -68,7 +69,9 @@ public class MainActivity extends Activity {
 
         screens[SCREEN_CALC] = buildCalcScreen();
         screens[SCREEN_EQUATIONS] = buildCatalogScreen(Catalog.EQUATIONS);
-        screens[SCREEN_EXAMPLES] = buildCatalogScreen(Catalog.EXAMPLES);
+        for (int i = 0; i < Catalog.EXAMPLE_PAGES.length; i++) {
+            screens[FIRST_PAGE + i] = buildExamplePage(Catalog.EXAMPLE_PAGES[i]);
+        }
         screens[SCREEN_HISTORY] = buildHistoryScreen();
         screens[SCREEN_HELP] = buildHelpScreen();
         for (View s : screens) {
@@ -92,6 +95,8 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (drawer.isOpen()) {
             drawer.close();
+        } else if (keypadOpen) {
+            setKeypadOpen(false);
         } else if (current != SCREEN_CALC) {
             showScreen(SCREEN_CALC);
         } else {
@@ -100,6 +105,22 @@ public class MainActivity extends Activity {
     }
 
     // ---------- оболочка: верхняя панель и левое меню ----------
+
+    private String titleOf(int id) {
+        if (id == SCREEN_CALC) return getString(R.string.menu_calc);
+        if (id == SCREEN_EQUATIONS) return getString(R.string.menu_equations);
+        if (id == SCREEN_HISTORY) return getString(R.string.menu_history);
+        if (id == SCREEN_HELP) return getString(R.string.menu_help);
+        return Catalog.EXAMPLE_PAGES[id - FIRST_PAGE].title;
+    }
+
+    private int iconOf(int id) {
+        if (id == SCREEN_CALC) return R.drawable.ic_calc;
+        if (id == SCREEN_EQUATIONS) return R.drawable.ic_equation;
+        if (id == SCREEN_HISTORY) return R.drawable.ic_history;
+        if (id == SCREEN_HELP) return R.drawable.ic_help;
+        return R.drawable.ic_examples;
+    }
 
     private View buildAppBar() {
         LinearLayout bar = new LinearLayout(this);
@@ -131,51 +152,73 @@ public class MainActivity extends Activity {
     private View buildNavigation() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(Ui.dp(this, 20), Ui.dp(this, 36), Ui.dp(this, 16), Ui.dp(this, 20));
+        col.setPadding(Ui.dp(this, 16), Ui.dp(this, 36), Ui.dp(this, 16), Ui.dp(this, 20));
 
-        TextView appName = Ui.text(this, getString(R.string.app_name), 22, R.color.on_surface, true);
-        col.addView(appName);
+        col.addView(Ui.text(this, getString(R.string.app_name), 22, R.color.on_surface, true));
         TextView sub = Ui.text(this, getString(R.string.drawer_subtitle), 13, R.color.on_surface_variant, false);
-        sub.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 24));
+        sub.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 16));
         col.addView(sub);
 
-        for (int i = 0; i < TITLES.length; i++) {
-            final int id = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
-            row.setClickable(true);
-            row.setMinimumHeight(Ui.dp(this, 56));
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { showScreen(id); }
-            });
-            ImageView icon = new ImageView(this);
-            icon.setImageResource(ICONS[i]);
-            navIcons[i] = icon;
-            row.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
+        col.addView(navGroup("Решение"));
+        col.addView(navItem(SCREEN_CALC));
+        col.addView(navItem(SCREEN_EQUATIONS));
 
-            TextView label = Ui.text(this, getString(TITLES[i]), 16, R.color.on_surface, false);
-            label.setPadding(Ui.dp(this, 18), 0, 0, 0);
-            navLabels[i] = label;
-            row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        col.addView(navGroup("Примеры"));
+        for (int i = 0; i < Catalog.EXAMPLE_PAGES.length; i++) col.addView(navItem(FIRST_PAGE + i));
 
-            navRows[i] = row;
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, Ui.dp(this, 3), 0, Ui.dp(this, 3));
-            col.addView(row, lp);
-            Ui.press(row);
-        }
+        col.addView(navGroup("Прочее"));
+        col.addView(navItem(SCREEN_HISTORY));
+        col.addView(navItem(SCREEN_HELP));
+
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         updateNav();
-        return col;
+        return sv;
+    }
+
+    private View navGroup(String text) {
+        TextView t = Ui.text(this, text.toUpperCase(), 11, R.color.accent, true);
+        t.setLetterSpacing(0.08f);
+        t.setPadding(Ui.dp(this, 18), Ui.dp(this, 16), 0, Ui.dp(this, 6));
+        return t;
+    }
+
+    private View navItem(final int id) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
+        row.setClickable(true);
+        row.setMinimumHeight(Ui.dp(this, 52));
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showScreen(id); }
+        });
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconOf(id));
+        navIcons[id] = icon;
+        row.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22)));
+
+        TextView label = Ui.text(this, titleOf(id), 15, R.color.on_surface, false);
+        label.setPadding(Ui.dp(this, 16), 0, 0, 0);
+        navLabels[id] = label;
+        row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        navRows[id] = row;
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, Ui.dp(this, 2), 0, Ui.dp(this, 2));
+        row.setLayoutParams(lp);
+        Ui.press(row);
+        return row;
     }
 
     private void updateNav() {
         for (int i = 0; i < navRows.length; i++) {
+            if (navRows[i] == null) continue;
             boolean selected = i == current;
             navRows[i].setBackground(selected
-                    ? Ui.rounded(Ui.color(this, R.color.accent_container), Ui.dp(this, 28))
-                    : Ui.ripple(0x00000000, Ui.dp(this, 28), 0x22000000));
+                    ? Ui.rounded(Ui.color(this, R.color.accent_container), Ui.dp(this, 26))
+                    : Ui.ripple(0x00000000, Ui.dp(this, 26), 0x22000000));
             int tint = Ui.color(this, selected ? R.color.on_accent_container : R.color.on_surface_variant);
             navIcons[i].setColorFilter(tint);
             navLabels[i].setTextColor(Ui.color(this, selected ? R.color.on_accent_container : R.color.on_surface));
@@ -194,6 +237,7 @@ public class MainActivity extends Activity {
 
         if (prev >= 0) {
             final View old = screens[prev];
+            old.animate().cancel();
             old.animate().alpha(0f).translationX(-Ui.dp(this, 24)).setDuration(160)
                     .withEndAction(new Runnable() {
                         @Override public void run() {
@@ -213,17 +257,18 @@ public class MainActivity extends Activity {
                 .setInterpolator(new DecelerateInterpolator()).start();
 
         if (prev < 0) {
-            title.setText(TITLES[id]);
+            title.setText(titleOf(id));
         } else {
             title.animate().alpha(0f).setDuration(110).withEndAction(new Runnable() {
                 @Override public void run() {
-                    title.setText(TITLES[id]);
+                    title.setText(titleOf(id));
                     title.animate().alpha(1f).setDuration(180).start();
                 }
             }).start();
         }
 
         if (id == SCREEN_HISTORY) refreshHistory();
+        if (id != SCREEN_CALC) setKeypadOpen(false);
         updateNav();
         drawer.close();
     }
@@ -252,7 +297,7 @@ public class MainActivity extends Activity {
         input.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        // Ввод — через встроенную математическую клавиатуру; системная не выезжает.
+        // Системная клавиатура не открывается: вместо неё выезжает математическая панель.
         input.setShowSoftInputOnFocus(false);
         input.setImeOptions(EditorInfo.IME_ACTION_DONE);
         input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -261,11 +306,34 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+        input.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { setKeypadOpen(true); }
+        });
+        input.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) setKeypadOpen(true);
+            }
+        });
         inputCard.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
+        keypadToggle = new ImageView(this);
+        keypadToggle.setImageResource(R.drawable.ic_keyboard);
+        keypadToggle.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8));
+        keypadToggle.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 22), 0x22000000));
+        keypadToggle.setClickable(true);
+        keypadToggle.setContentDescription("Клавиатура");
+        keypadToggle.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { setKeypadOpen(!keypadOpen); }
+        });
+        actions.addView(keypadToggle, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
+
+        View spacer = new View(this);
+        actions.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+
         TextView solveButton = Ui.text(this, getString(R.string.solve), 15, R.color.on_accent, true);
         solveButton.setGravity(Gravity.CENTER);
         solveButton.setPadding(Ui.dp(this, 22), Ui.dp(this, 10), Ui.dp(this, 22), Ui.dp(this, 10));
@@ -310,15 +378,64 @@ public class MainActivity extends Activity {
         resultScroll.addView(results, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         col.addView(resultScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
+        // Панель: ручка для сворачивания + клавиатура. По умолчанию скрыта.
+        keypadBox = new LinearLayout(this);
+        keypadBox.setOrientation(LinearLayout.VERTICAL);
+        keypadBox.setBackground(Ui.roundedTop(Ui.color(this, R.color.surface_variant), Ui.dp(this, 28)));
+        keypadBox.addView(buildHandle(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 28)));
         KeypadView keypad = new KeypadView(this, new KeypadView.Listener() {
             @Override public void onInsert(String text, int cursorBack) { insert(text, cursorBack); }
             @Override public void onDelete() { deleteBack(); }
             @Override public void onClear() { input.getText().clear(); }
             @Override public void onSolve() { solve(); }
         });
-        keypad.setBackground(Ui.roundedTop(Ui.color(this, R.color.surface_variant), Ui.dp(this, 28)));
-        col.addView(keypad, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        keypadBox.addView(keypad, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        keypadBox.setVisibility(View.GONE);
+        col.addView(keypadBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return col;
+    }
+
+    private View buildHandle() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        row.setClickable(true);
+        row.setContentDescription("Свернуть клавиатуру");
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { setKeypadOpen(false); }
+        });
+        View pill = new View(this);
+        pill.setBackground(Ui.rounded(Ui.color(this, R.color.on_surface_variant), Ui.dp(this, 2)));
+        row.addView(pill, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 4)));
+        TextView hint = Ui.text(this, "Свернуть", 12, R.color.on_surface_variant, true);
+        hint.setPadding(Ui.dp(this, 10), 0, 0, 0);
+        row.addView(hint);
+        return row;
+    }
+
+    /** Показ и сворачивание клавиатуры с анимацией выезда снизу. */
+    private void setKeypadOpen(boolean open) {
+        if (open == keypadOpen) return;
+        keypadOpen = open;
+        keypadBox.animate().cancel();
+        float h = Ui.dp(this, PANEL_HEIGHT_DP);
+        if (open) {
+            keypadBox.setVisibility(View.VISIBLE);
+            keypadBox.setAlpha(0f);
+            keypadBox.setTranslationY(h);
+            keypadBox.animate().translationY(0f).alpha(1f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        } else {
+            keypadBox.animate().translationY(h).alpha(0f).setDuration(200)
+                    .setInterpolator(new AccelerateInterpolator())
+                    .withEndAction(new Runnable() {
+                        @Override public void run() {
+                            if (!keypadOpen) keypadBox.setVisibility(View.GONE);
+                            keypadBox.setTranslationY(0f);
+                        }
+                    }).start();
+        }
+        keypadToggle.setColorFilter(Ui.color(this, open ? R.color.accent : R.color.on_surface_variant));
     }
 
     private void insert(String text, int cursorBack) {
@@ -389,7 +506,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    // ---------- экраны «Уравнения» и «Примеры» ----------
+    // ---------- экран «Уравнения» ----------
 
     private View buildCatalogScreen(Catalog.Section[] sections) {
         ScrollView sv = new ScrollView(this);
@@ -407,6 +524,31 @@ public class MainActivity extends Activity {
                     @Override public void onClick(View v) { openQuery(item.expr, true); }
                 }), lp);
             }
+        }
+        sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return sv;
+    }
+
+    // ---------- страница одной категории примеров ----------
+
+    private View buildExamplePage(Catalog.Page page) {
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        col.setPadding(p, 0, p, Ui.dp(this, 28));
+
+        TextView sub = Ui.text(this, page.subtitle, 14, R.color.on_surface_variant, false);
+        sub.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 10));
+        col.addView(sub);
+
+        for (final Catalog.Item item : page.items) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+            col.addView(Cards.row(this, item.expr, item.note, new View.OnClickListener() {
+                @Override public void onClick(View v) { openQuery(item.expr, true); }
+            }), lp);
         }
         sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return sv;

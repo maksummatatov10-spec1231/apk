@@ -6,6 +6,7 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 
@@ -56,7 +57,8 @@ final class SideDrawer extends FrameLayout {
         panel = new FrameLayout(c);
         panel.setBackgroundColor(Ui.color(c, R.color.surface));
         panel.setElevation(Ui.dp(c, 12));
-        panel.addView(panelContent);
+        panel.addView(panelContent, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         addView(panel);
     }
 

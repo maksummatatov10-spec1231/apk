@@ -2,6 +2,8 @@ package com.example.calcpro.math;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,8 +34,29 @@ public final class Solver {
             if (!p.trim().isEmpty()) parts.add(p.trim());
         }
         if (parts.size() >= 2) return solveSystem(parts);
-        if (s.indexOf('=') >= 0) return solveEquation(s);
+        if (s.indexOf('=') >= 0) {
+            Matcher m = GRAPH_FORM.matcher(s);
+            if (m.matches()) return solveGraphForm(m.group(1));
+            return solveEquation(s);
+        }
         return solveExpression(s);
+    }
+
+    /** Запись графика: «y = f(x)» или «f(x) = …». */
+    private static final Pattern GRAPH_FORM = Pattern.compile("\\s*(?:y|f\\(x\\))\\s*=(.+)", Pattern.DOTALL);
+
+    private static Result solveGraphForm(String rhs) {
+        Node n = Parser.parse(rhs);
+        Set<String> vars = new TreeSet<>();
+        n.collectVars(vars);
+        if (!(vars.isEmpty() || (vars.size() == 1 && vars.contains("x")))) {
+            throw new MathError("График строится по переменной x: правая часть должна зависеть только от x");
+        }
+        Result r = new Result();
+        r.heading = "График функции";
+        r.steps.add("f(x) = " + n.show());
+        r.graph = n;
+        return r;
     }
 
     // ---------- выражения ----------

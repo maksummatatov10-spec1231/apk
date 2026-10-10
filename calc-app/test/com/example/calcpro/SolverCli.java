@@ -56,17 +56,22 @@ public final class SolverCli {
     static String catalogJson() {
         StringBuilder sb = new StringBuilder("[");
         boolean firstGroup = true;
-        for (String group : new String[] {"equations", "examples"}) {
-            Catalog.Section[] sections = "equations".equals(group) ? Catalog.EQUATIONS : Catalog.EXAMPLES;
-            for (Catalog.Section s : sections) {
-                for (Catalog.Item it : s.items) {
-                    if (!firstGroup) sb.append(',');
-                    firstGroup = false;
-                    sb.append("{\"group\":").append(str(group))
-                      .append(",\"section\":").append(str(s.title))
-                      .append(",\"expr\":").append(str(it.expr))
-                      .append(",\"note\":").append(str(it.note)).append('}');
-                }
+        for (Catalog.Section s : Catalog.EQUATIONS) {
+            for (Catalog.Item it : s.items) {
+                if (!firstGroup) sb.append(',');
+                firstGroup = false;
+                sb.append("{\"group\":\"equations\",\"section\":").append(str(s.title))
+                  .append(",\"expr\":").append(str(it.expr))
+                  .append(",\"note\":").append(str(it.note)).append('}');
+            }
+        }
+        for (Catalog.Page p : Catalog.EXAMPLE_PAGES) {
+            for (Catalog.Item it : p.items) {
+                if (!firstGroup) sb.append(',');
+                firstGroup = false;
+                sb.append("{\"group\":\"examples\",\"section\":").append(str(p.title))
+                  .append(",\"expr\":").append(str(it.expr))
+                  .append(",\"note\":").append(str(it.note)).append('}');
             }
         }
         return sb.append(']').toString();

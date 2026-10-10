@@ -13,7 +13,7 @@ import android.widget.TextView;
 
 /**
  * Математическая клавиатура: три страницы (цифры, функции, символы), переключаются вкладками.
- * Клавиша с (insert == null) — служебная: «AC», «⌫» или «=».
+ * Клавиша с (insert == null) — служебная: «AC», «⌫» или «Решить». «=» — обычный знак.
  */
 final class KeypadView extends LinearLayout {
 
@@ -47,7 +47,7 @@ final class KeypadView extends LinearLayout {
     private static Key o(String label, String insert) { return new Key(label, insert, 0, OP); }
     private static Key clear() { return new Key("AC", null, 0, ACTION); }
     private static Key del() { return new Key("⌫", null, 0, ACTION); }
-    private static Key solve() { return new Key("=", null, 0, SOLVE); }
+    private static Key solve() { return new Key("Решить", null, 0, SOLVE); }
 
     private static final Key[][][] PAGES = {
         { // Цифры
@@ -55,14 +55,14 @@ final class KeypadView extends LinearLayout {
             {d("7", "7"), d("8", "8"), d("9", "9"), o("×", "×"), o("x", "x")},
             {d("4", "4"), d("5", "5"), d("6", "6"), o("−", "−"), o("y", "y")},
             {d("1", "1"), d("2", "2"), d("3", "3"), o("+", "+"), o("^", "^")},
-            {d("0", "0"), d(",", ","), o("%", "%"), o("!", "!"), solve()},
+            {d("0", "0"), d(",", ","), o("=", "="), o("!", "!"), solve()},
         },
         { // Функции
             {f("sin", "sin()"), f("cos", "cos()"), f("tan", "tan()"), f("asin", "asin()"), f("acos", "acos()")},
             {f("atan", "atan()"), f("ln", "ln()"), f("log", "log()"), f("√", "√("), f("∛", "∛(")},
             {f("x²", "^2"), f("x³", "^3"), f("eˣ", "e^"), f("10ˣ", "10^"), f("|x|", "abs(")},
             {f("π", "π"), f("e", "e"), f("n!", "!"), f("1/x", "1/"), f("xⁿ", "^")},
-            {fb("()", "()", 1), d(",", ","), f("⌫", null), f("AC", null), solve()},
+            {fb("()", "()", 1), o("=", "="), f("⌫", null), f("AC", null), solve()},
         },
         { // Символы
             {d("x", "x"), d("y", "y"), d("z", "z"), d("a", "a"), d("b", "b")},
@@ -160,7 +160,7 @@ final class KeypadView extends LinearLayout {
                 size = 17; bold = true; break;
             case SOLVE:
                 bg = Ui.color(c, R.color.key_action); text = Ui.color(c, R.color.on_accent);
-                size = 24; bold = true; break;
+                size = 14; bold = true; break;
             default:
                 bg = Ui.color(c, R.color.key_digit); text = Ui.color(c, R.color.on_surface);
                 size = 22; bold = false; break;
