@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Сборка и подпись APK из smali-исходников.
 #   1. apktool b  — smali -> classes.dex, ресурсы/манифест -> aapt2
-#   2. sign_apk.py — подпись схемой v1 (debug-ключ)
+#   2. sign_apk.py — подпись схемами v1 + v2 (debug-ключ)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,16 +29,12 @@ echo "==> apktool b (smali + aapt2)"
 java -jar "$T/apktool.jar" b "$HERE/app" --use-aapt2 -p "$OUT/framework" \
   -o "$OUT/unsigned.apk"
 
-echo "==> Подпись (v1)"
+echo "==> Подпись (v1 + v2)"
 python3 "$HERE/../tools/sign_apk.py" "$OUT/unsigned.apk" "$OUT/hello.apk" \
   "$KEYDIR/key.pem" "$KEYDIR/cert.pem"
 
 echo "==> Проверка подписи"
-TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT
-unzip -q "$OUT/hello.apk" 'META-INF/*' -d "$TMPD"
-openssl cms -verify -noverify -binary -inform DER \
-  -in "$TMPD/META-INF/CERT.RSA" -content "$TMPD/META-INF/CERT.SF" >/dev/null
-echo "CMS-подпись CERT.SF: OK"
+python3 "$HERE/../tools/verify_apk.py" "$OUT/hello.apk"
 
 echo "==> Готово: $OUT/hello.apk"
 ls -la "$OUT/hello.apk"

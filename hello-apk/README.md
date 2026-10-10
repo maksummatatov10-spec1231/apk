@@ -13,7 +13,8 @@ app/
 scripts/
   setup-toolchain.sh           установка тулчейна в ~/android-toolchain
   build-apk.sh                 сборка + подпись APK -> build/hello.apk
-  sign_apk.py                  подпись схемой v1 (JAR-подпись)
+  sign_apk.py                  подпись схемами v1 (JAR) и v2 (APK Signature Scheme v2)
+  verify_apk.py                (в ../tools) проверка подписи v1 и v2
 ```
 
 ## Быстрый старт
@@ -34,7 +35,7 @@ scripts/
   поэтому Android SDK и Gradle не ставятся; используется `android.jar` из GitHub-репозитория
   `Sable/android-platforms`.
 - Подпись — debug-ключ (создаётся в `~/android-toolchain/debug-key`, в репозиторий не попадает),
-  схема v1. Для публикации в Google Play нужны подпись v2/v3 (`apksigner`) и свой ключ.
+  схемы v1 и v2 (нужна Android 11+ при targetSdk ≥ 30). Для публикации в Google Play нужен свой ключ.
 - Эмулятор и реальное устройство в песочнице недоступны, запуск не проверялся на Android-устройстве.
   Проверены: структура APK, манифест (`aapt2 dump badging`), хеши и CMS-подпись,
   декомпиляция dex обратно в smali.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Сборка APK калькулятора без Android Studio/Gradle:
-#   aapt2 compile/link (ресурсы, R.java) -> javac 8 -> D8 (dex) -> zip -> подпись v1 -> проверка
+#   aapt2 compile/link (ресурсы, R.java) -> javac 8 -> D8 (dex) -> zip -> подпись v1+v2 -> проверка
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -49,15 +49,12 @@ find "$OUT/classes" -name '*.class' > "$OUT/classes.txt"
 mapfile -t CLASSES < "$OUT/classes.txt"
 d8 --min-api 21 --lib "$ANDROID_JAR" --output "$OUT/dex" "${CLASSES[@]}"
 
-echo "==> 5/6 упаковка и подпись (v1)"
+echo "==> 5/6 упаковка и подпись (v1 + v2)"
 cp "$OUT/base.apk" "$OUT/unsigned.apk"
 (cd "$OUT/dex" && zip -q "$OUT/unsigned.apk" classes*.dex)
 python3 "$TOOLS/sign_apk.py" "$OUT/unsigned.apk" "$OUT/calc.apk" "$KEYDIR/key.pem" "$KEYDIR/cert.pem"
 
 echo "==> 6/6 проверка"
 aapt2 dump badging "$OUT/calc.apk" | head -6
-TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT
-unzip -q "$OUT/calc.apk" 'META-INF/*' -d "$TMPD"
-openssl cms -verify -noverify -binary -inform DER \
-  -in "$TMPD/META-INF/CERT.RSA" -content "$TMPD/META-INF/CERT.SF" >/dev/null 2>&1 && echo "Подпись CERT.RSA: OK"
+python3 "$TOOLS/verify_apk.py" "$OUT/calc.apk"
 echo "==> Готово: $OUT/calc.apk ($(stat -c %s "$OUT/calc.apk") байт)"
