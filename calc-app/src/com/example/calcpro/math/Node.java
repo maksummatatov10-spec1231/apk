@@ -174,10 +174,29 @@ public final class Node {
                     Node r = b.stepOnce();
                     return r == null ? null : bin(name, a, r);
                 }
+                if (isExpandablePower()) return expandPower();
                 return evaluateConstant();
             default:
                 return null;
         }
+    }
+
+    /** Степень натурального основания с небольшим целым показателем раскрывается в произведение. */
+    private boolean isExpandablePower() {
+        if (!"^".equals(name) || a.kind != Kind.NUM || b.kind != Kind.NUM) return false;
+        Rational base = a.num, exp = b.num;
+        if (!base.isInteger() || base.signum() <= 0 || !exp.isInteger()) return false;
+        if (exp.numerator().bitLength() >= 6) return false;
+        int n = exp.numerator().intValue();
+        return n >= 2 && n <= 30;
+    }
+
+    /** 9^3 → ((9 · 9) · 9): на каждом шаге сворачивается первое умножение. */
+    private Node expandPower() {
+        int n = b.num.numerator().intValue();
+        Node acc = a;
+        for (int i = 1; i < n; i++) acc = bin("*", acc, a);
+        return acc;
     }
 
     private Node evaluateConstant() {

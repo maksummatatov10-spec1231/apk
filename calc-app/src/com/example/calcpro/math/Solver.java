@@ -105,7 +105,7 @@ public final class Solver {
             }
             r.steps.add("Раскрываем скобки и приводим подобные: " + p.format() + " = 0");
             solvePoly(p, r);
-        } else {
+        } else if (!solveRadical(left, right, f, r)) {
             solveNumeric(f, r);
         }
         normalizeRoots(r);
@@ -384,13 +384,96 @@ public final class Solver {
     }
 
     /** Нелинейное уравнение: сканирование знака на [−50; 50] и уточнение бисекцией. */
+    /**
+     * Уравнение вида √(A) = P или ∛(A) = P (P — многочлен): возводим в степень, получаем многочлен,
+     * его корни проверяем подстановкой в исходное уравнение (отсекаем посторонние корни и ОДЗ).
+     * Возвращает false, если уравнение не такого вида.
+     */
+    private static boolean solveRadical(Node left, Node right, Node f, Result r) {
+        Poly inner;
+        Poly p;
+        int n;
+        if (isRadical(left) && isRadical(right) && left.name.equals(right.name)) {
+            // √(A) = √(B): под корнями одинаковой степени — приравниваем подкоренные выражения
+            inner = left.a.toPoly();
+            p = right.a.toPoly();
+            n = 1;
+            if (inner == null || p == null) return false;
+            r.steps.add("Корни одинаковой степени: приравниваем подкоренные выражения.");
+        } else {
+            Node rad;
+            Node other;
+            if (isRadical(left) && right.toPoly() != null) {
+                rad = left;
+                other = right;
+            } else if (isRadical(right) && left.toPoly() != null) {
+                rad = right;
+                other = left;
+            } else {
+                return false;
+            }
+            inner = rad.a.toPoly();
+            p = other.toPoly();
+            if (inner == null || p == null) return false;
+            n = "sqrt".equals(rad.name) ? 2 : 3;
+            r.steps.add("Избавляемся от корня " + ("sqrt".equals(rad.name) ? "√" : "∛")
+                    + ": возводим обе части в степень " + n + ".");
+        }
+        Poly eq = inner.sub(p.pow(n));
+        if (eq.degree() == 0) {
+            if (eq.isZero()) return false;   // тождество: решения — вся область, отдаём численному методу
+            r.steps.add("Получаем неверное равенство " + eq.format() + " = 0: решений нет.");
+            r.answers.add("Решений нет");
+            return true;
+        }
+        r.steps.add("Получаем уравнение: " + eq.format() + " = 0");
+
+        List<double[]> cands = new ArrayList<>();
+        if (eq.degree() == 1) {
+            cands.add(new double[] {eq.coef(0).neg().div(eq.coef(1)).toDouble(), 0});
+        } else {
+            cands.addAll(durandKerner(eq));
+        }
+        List<Double> xs = new ArrayList<>();
+        for (double[] c : cands) {
+            if (Math.abs(c[1]) > 1e-7) continue;          // только действительные корни
+            Double v = evalAt(f, c[0]);
+            if (v == null || Math.abs(v) > 1e-6) continue; // подстановка в исходное уравнение
+            addRoot(xs, c[0]);
+        }
+        if (xs.isEmpty()) {
+            r.steps.add("Подстановка в исходное уравнение отсекла все корни: решений нет.");
+            r.answers.add("Решений нет");
+            return true;
+        }
+        Collections.sort(xs);
+        r.steps.add("Проверка подстановкой: все найденные корни удовлетворяют исходному уравнению.");
+        for (double x : xs) {
+            double nearest = Math.rint(x);
+            boolean integer = Math.abs(x - nearest) < 1e-6;
+            r.answers.add(integer ? "x = " + Fmt.num(nearest) : "x ≈ " + Fmt.num(x));
+            r.marks.add(x);
+        }
+        return true;
+    }
+
+    private static boolean isRadical(Node n) {
+        return n.kind == Node.Kind.FUN && ("sqrt".equals(n.name) || "cbrt".equals(n.name));
+    }
+
+    /**
+     * Численный поиск корней на [−10; 10]: шаг 0,01, смена знака (бисекция) и касания
+     * (минимум |f(x)| около нуля). Точки разрыва (например, tan) отсекаются проверкой |f| в корне.
+     */
     private static void solveNumeric(Node f, Result r) {
         r.steps.add("Уравнение не сводится к многочлену. Ищем корни численно: сканируем f(x) = "
-                + f.show() + " на отрезке [−10; 10] с шагом 0,01 и уточняем смену знака методом бисекции.");
+                + f.show() + " на отрезке [−10; 10] с шагом 0,01, ищем смену знака и касания; "
+                + "корни уточняем бисекцией. Точки разрыва отбрасываем.");
         double step = 0.01;
-        Double prevF = null;
-        double prevX = -10;
         List<Double> roots = new ArrayList<>();
+        Double ppF = null;          // f(x − 2·шаг)
+        Double prevF = null;        // f(x − шаг)
+        double prevX = -10;
         for (int i = 0; i <= 2000 && roots.size() < 20; i++) {
             double x = -10 + i * step;
             Double fx = evalAt(f, x);
@@ -398,19 +481,48 @@ public final class Solver {
                 addRoot(roots, x);
             } else if (fx != null && prevF != null && prevF * fx < 0) {
                 double root = bisect(f, prevX, x);
-                addRoot(roots, root);
+                if (isRoot(f, root)) addRoot(roots, root);
             }
+            // касание: |f| имеет локальный минимум около нуля в точке prevX
+            if (fx != null && prevF != null && ppF != null
+                    && Math.abs(prevF) <= Math.abs(ppF) && Math.abs(prevF) <= Math.abs(fx)
+                    && Math.abs(prevF) < 1e-3) {
+                double root = minimizeAbs(f, prevX - step, x);
+                if (isRoot(f, root)) addRoot(roots, root);
+            }
+            ppF = prevF;
             prevF = fx;
             prevX = x;
         }
         if (roots.isEmpty()) {
-            r.answers.add("На отрезке [−10; 10] корней не найдено");
+            r.answers.add("Решений на отрезке [−10; 10] нет");
             return;
         }
+        Collections.sort(roots);
         for (double root : roots) {
             r.answers.add("x ≈ " + Fmt.num(root));
             r.marks.add(root);
         }
+    }
+
+    private static boolean isRoot(Node f, double x) {
+        Double v = evalAt(f, x);
+        return v != null && Math.abs(v) < 1e-7;
+    }
+
+    /** Точка минимума |f| на отрезке (тернарный поиск, |f| унимодальна рядом с касанием). */
+    private static double minimizeAbs(Node f, double lo, double hi) {
+        for (int it = 0; it < 200; it++) {
+            double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+            if (absAt(f, m1) < absAt(f, m2)) hi = m2;
+            else lo = m1;
+        }
+        return (lo + hi) / 2;
+    }
+
+    private static double absAt(Node f, double x) {
+        Double v = evalAt(f, x);
+        return v == null ? Double.MAX_VALUE : Math.abs(v);
     }
 
     private static void addRoot(List<Double> roots, double x) {
