@@ -231,6 +231,7 @@ public final class Node {
             case FUN:
                 if ("!".equals(name)) return a.show(5) + "!";
                 if ("sqrt".equals(name)) return "√(" + a.show(0) + ")";
+                if ("cbrt".equals(name)) return "∛(" + a.show(0) + ")";
                 if ("abs".equals(name)) return "|" + a.show(0) + "|";
                 return name + "(" + a.show(0) + ")";
             case BIN: {

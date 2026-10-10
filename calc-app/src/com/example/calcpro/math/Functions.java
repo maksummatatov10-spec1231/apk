@@ -7,7 +7,7 @@ public final class Functions {
     public static boolean isFunction(String name) {
         switch (name) {
             case "sin": case "cos": case "tan": case "asin": case "acos": case "atan":
-            case "ln": case "log": case "lg": case "exp": case "sqrt": case "abs":
+            case "ln": case "log": case "lg": case "exp": case "sqrt": case "cbrt": case "abs":
                 return true;
             default:
                 return false;
@@ -39,6 +39,7 @@ public final class Functions {
             case "sqrt":
                 if (x < 0) throw new MathError("Корень из отрицательного числа в действительных числах не существует");
                 return Math.sqrt(x);
+            case "cbrt": return Math.cbrt(x);
             case "abs": return Math.abs(x);
             case "!": {
                 if (x < 0 || x != Math.floor(x) || x > 170) throw new MathError("Факториал — для целых неотрицательных чисел");

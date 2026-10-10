@@ -1,21 +1,18 @@
 package com.example.calcpro;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.content.res.ColorStateList;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.Editable;
-import android.util.TypedValue;
-import android.view.KeyEvent;
+import android.text.InputType;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -24,315 +21,461 @@ import android.widget.Toast;
 import com.example.calcpro.math.MathError;
 import com.example.calcpro.math.Solver;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends Activity {
 
-    private static final String DEL = "<DEL>";
-    private static final String CLR = "<CLR>";
+    static final int SCREEN_CALC = 0;
+    static final int SCREEN_EQUATIONS = 1;
+    static final int SCREEN_EXAMPLES = 2;
+    static final int SCREEN_HISTORY = 3;
+    static final int SCREEN_HELP = 4;
 
-    /** Клавиатура: строки пар «подпись, вставляемый текст». */
-    private static final String[][] KEYS = {
-        {"sin", "sin(", "cos", "cos(", "tan", "tan(", "ln", "ln(", "log", "log("},
-        {"x", "x", "x²", "^2", "xⁿ", "^", "√", "√(", "π", "π"},
-        {"(", "(", ")", ")", "!", "!", "%", "%", "⌫", DEL},
-        {"7", "7", "8", "8", "9", "9", "÷", "÷", "C", CLR},
-        {"4", "4", "5", "5", "6", "6", "×", "×", "−", "−"},
-        {"1", "1", "2", "2", "3", "3", "+", "+", "=", "="},
-        {"0", "0", ",", ",", "e", "e", "|x|", "abs(", ".", "."},
+    private static final int[] TITLES = {
+        R.string.menu_calc, R.string.menu_equations, R.string.menu_examples, R.string.menu_history, R.string.menu_help,
+    };
+    private static final int[] ICONS = {
+        R.drawable.ic_calc, R.drawable.ic_equation, R.drawable.ic_examples, R.drawable.ic_history, R.drawable.ic_help,
     };
 
+    private SideDrawer drawer;
+    private HamburgerView hamburger;
+    private TextView title;
+    private FrameLayout screenHost;
+    private final View[] screens = new View[TITLES.length];
+    private final View[] navRows = new View[TITLES.length];
+    private final ImageView[] navIcons = new ImageView[TITLES.length];
+    private final TextView[] navLabels = new TextView[TITLES.length];
+    private int current = -1;
+
     private EditText input;
-    private ScrollView scroll;
     private LinearLayout results;
-    private LinearLayout keypad;
-    private final List<String> history = new ArrayList<>();
+    private ScrollView resultScroll;
+    private LinearLayout historyList;
+    private TextView historyEmpty;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        setContentView(R.layout.activity_main);
-        input = findViewById(R.id.input);
-        scroll = findViewById(R.id.scroll);
-        results = findViewById(R.id.results);
-        keypad = findViewById(R.id.keypad);
 
-        buildKeypad();
-        findViewById(R.id.btn_solve).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { solve(); }
-        });
-        findViewById(R.id.btn_history).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { showHistory(); }
-        });
-        findViewById(R.id.btn_clear_results).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                results.removeAllViews();
-                addWelcomeCard();
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Ui.color(this, R.color.surface));
+        root.addView(buildAppBar(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 60)));
+
+        screenHost = new FrameLayout(this);
+        root.addView(screenHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        screens[SCREEN_CALC] = buildCalcScreen();
+        screens[SCREEN_EQUATIONS] = buildCatalogScreen(Catalog.EQUATIONS);
+        screens[SCREEN_EXAMPLES] = buildCatalogScreen(Catalog.EXAMPLES);
+        screens[SCREEN_HISTORY] = buildHistoryScreen();
+        screens[SCREEN_HELP] = buildHelpScreen();
+        for (View s : screens) {
+            s.setVisibility(View.GONE);
+            screenHost.addView(s, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
+        drawer = new SideDrawer(this, root, buildNavigation());
+        drawer.setProgressListener(new SideDrawer.ProgressListener() {
+            @Override public void onProgress(float progress) {
+                hamburger.setProgress(progress);
             }
         });
-        findViewById(R.id.btn_keypad).setOnClickListener(new View.OnClickListener() {
+        setContentView(drawer);
+
+        showScreen(SCREEN_CALC);
+        if (results.getChildCount() == 0) addWelcome();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (drawer.isOpen()) {
+            drawer.close();
+        } else if (current != SCREEN_CALC) {
+            showScreen(SCREEN_CALC);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    // ---------- оболочка: верхняя панель и левое меню ----------
+
+    private View buildAppBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(Ui.dp(this, 6), 0, Ui.dp(this, 16), 0);
+
+        FrameLayout menuButton = new FrameLayout(this);
+        menuButton.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 24), 0x22000000));
+        menuButton.setClickable(true);
+        menuButton.setContentDescription(getString(R.string.menu_calc));
+        hamburger = new HamburgerView(this);
+        hamburger.setColor(Ui.color(this, R.color.on_surface));
+        menuButton.addView(hamburger, new FrameLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24), Gravity.CENTER));
+        menuButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                keypad.setVisibility(keypad.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                if (drawer.isOpen()) drawer.close();
+                else drawer.open();
             }
         });
+        bar.addView(menuButton, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
+
+        title = Ui.text(this, getString(R.string.menu_calc), 22, R.color.on_surface, true);
+        title.setPadding(Ui.dp(this, 8), 0, 0, 0);
+        bar.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return bar;
+    }
+
+    private View buildNavigation() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(Ui.dp(this, 20), Ui.dp(this, 36), Ui.dp(this, 16), Ui.dp(this, 20));
+
+        TextView appName = Ui.text(this, getString(R.string.app_name), 22, R.color.on_surface, true);
+        col.addView(appName);
+        TextView sub = Ui.text(this, getString(R.string.drawer_subtitle), 13, R.color.on_surface_variant, false);
+        sub.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 24));
+        col.addView(sub);
+
+        for (int i = 0; i < TITLES.length; i++) {
+            final int id = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
+            row.setClickable(true);
+            row.setMinimumHeight(Ui.dp(this, 56));
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { showScreen(id); }
+            });
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(ICONS[i]);
+            navIcons[i] = icon;
+            row.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
+
+            TextView label = Ui.text(this, getString(TITLES[i]), 16, R.color.on_surface, false);
+            label.setPadding(Ui.dp(this, 18), 0, 0, 0);
+            navLabels[i] = label;
+            row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            navRows[i] = row;
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, Ui.dp(this, 3), 0, Ui.dp(this, 3));
+            col.addView(row, lp);
+            Ui.press(row);
+        }
+        updateNav();
+        return col;
+    }
+
+    private void updateNav() {
+        for (int i = 0; i < navRows.length; i++) {
+            boolean selected = i == current;
+            navRows[i].setBackground(selected
+                    ? Ui.rounded(Ui.color(this, R.color.accent_container), Ui.dp(this, 28))
+                    : Ui.ripple(0x00000000, Ui.dp(this, 28), 0x22000000));
+            int tint = Ui.color(this, selected ? R.color.on_accent_container : R.color.on_surface_variant);
+            navIcons[i].setColorFilter(tint);
+            navLabels[i].setTextColor(Ui.color(this, selected ? R.color.on_accent_container : R.color.on_surface));
+            navLabels[i].setTypeface(selected ? android.graphics.Typeface.DEFAULT_BOLD : android.graphics.Typeface.DEFAULT);
+        }
+    }
+
+    /** Переключение экрана: старый уезжает и гаснет, новый выезжает. */
+    private void showScreen(final int id) {
+        if (id == current) {
+            drawer.close();
+            return;
+        }
+        final int prev = current;
+        current = id;
+
+        if (prev >= 0) {
+            final View old = screens[prev];
+            old.animate().alpha(0f).translationX(-Ui.dp(this, 24)).setDuration(160)
+                    .withEndAction(new Runnable() {
+                        @Override public void run() {
+                            if (current != prev) {
+                                old.setVisibility(View.GONE);
+                            }
+                            old.setTranslationX(0f);
+                        }
+                    }).start();
+        }
+        View nw = screens[id];
+        nw.animate().cancel();
+        nw.setVisibility(View.VISIBLE);
+        nw.setAlpha(0f);
+        nw.setTranslationX(Ui.dp(this, 24));
+        nw.animate().alpha(1f).translationX(0f).setStartDelay(60).setDuration(260)
+                .setInterpolator(new DecelerateInterpolator()).start();
+
+        if (prev < 0) {
+            title.setText(TITLES[id]);
+        } else {
+            title.animate().alpha(0f).setDuration(110).withEndAction(new Runnable() {
+                @Override public void run() {
+                    title.setText(TITLES[id]);
+                    title.animate().alpha(1f).setDuration(180).start();
+                }
+            }).start();
+        }
+
+        if (id == SCREEN_HISTORY) refreshHistory();
+        updateNav();
+        drawer.close();
+    }
+
+    // ---------- экран «Калькулятор» ----------
+
+    private View buildCalcScreen() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout inputCard = new LinearLayout(this);
+        inputCard.setOrientation(LinearLayout.VERTICAL);
+        int pad = Ui.dp(this, 14);
+        inputCard.setPadding(pad, Ui.dp(this, 10), pad, Ui.dp(this, 10));
+        inputCard.setBackground(Ui.rounded(Ui.color(this, R.color.surface_high), Ui.dp(this, 24)));
+
+        input = new EditText(this);
+        input.setHint(R.string.input_hint);
+        input.setHintTextColor(Ui.color(this, R.color.on_surface_variant));
+        input.setTextColor(Ui.color(this, R.color.on_surface));
+        input.setTextSize(22);
+        input.setBackground(null);
+        input.setGravity(Gravity.TOP | Gravity.START);
+        input.setMinLines(2);
+        input.setMaxLines(4);
+        input.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        // Ввод — через встроенную математическую клавиатуру; системная не выезжает.
+        input.setShowSoftInputOnFocus(false);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE);
         input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView tv, int actionId, KeyEvent ev) {
                 solve();
                 return true;
             }
         });
-        addWelcomeCard();
-    }
+        inputCard.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-    // ---------- клавиатура ----------
-
-    private void buildKeypad() {
-        for (String[] row : KEYS) {
-            LinearLayout line = new LinearLayout(this);
-            line.setOrientation(LinearLayout.HORIZONTAL);
-            for (int i = 0; i < row.length; i += 2) {
-                Button b = keyButton(row[i], row[i + 1]);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(46), 1f);
-                lp.setMargins(dp(3), dp(3), dp(3), dp(3));
-                line.addView(b, lp);
-            }
-            keypad.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        }
-    }
-
-    private Button keyButton(String label, String insert) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setMinWidth(0);
-        b.setMinimumWidth(0);
-        b.setMinHeight(0);
-        b.setMinimumHeight(0);
-        b.setPadding(0, 0, 0, 0);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        boolean action = "=".equals(insert) || CLR.equals(insert) || DEL.equals(insert);
-        b.setTextColor(color(action ? R.color.accent : R.color.on_surface));
-        b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setBackground(ripple(color(R.color.key_bg), dp(12)));
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { onKey(insert); }
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        TextView solveButton = Ui.text(this, getString(R.string.solve), 15, R.color.on_accent, true);
+        solveButton.setGravity(Gravity.CENTER);
+        solveButton.setPadding(Ui.dp(this, 22), Ui.dp(this, 10), Ui.dp(this, 22), Ui.dp(this, 10));
+        solveButton.setBackground(Ui.ripple(Ui.color(this, R.color.accent), Ui.dp(this, 20), 0x33FFFFFF));
+        solveButton.setClickable(true);
+        Ui.press(solveButton);
+        solveButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { solve(); }
         });
-        return b;
+        actions.addView(solveButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        inputCard.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.setMargins(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        col.addView(inputCard, cardLp);
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView resultsTitle = Ui.text(this, getString(R.string.results), 13, R.color.on_surface_variant, true);
+        resultsTitle.setLetterSpacing(0.06f);
+        head.addView(resultsTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView clear = Ui.text(this, getString(R.string.clear), 14, R.color.accent, true);
+        clear.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+        clear.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 16), 0x22000000));
+        clear.setClickable(true);
+        clear.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { clearResults(); }
+        });
+        head.addView(clear, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams headLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headLp.setMargins(Ui.dp(this, 20), Ui.dp(this, 10), Ui.dp(this, 12), 0);
+        col.addView(head, headLp);
+
+        resultScroll = new ScrollView(this);
+        resultScroll.setClipToPadding(false);
+        resultScroll.setVerticalScrollBarEnabled(false);
+        results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        int rp = Ui.dp(this, 12);
+        results.setPadding(rp, Ui.dp(this, 8), rp, Ui.dp(this, 12));
+        resultScroll.addView(results, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        col.addView(resultScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        KeypadView keypad = new KeypadView(this, new KeypadView.Listener() {
+            @Override public void onInsert(String text, int cursorBack) { insert(text, cursorBack); }
+            @Override public void onDelete() { deleteBack(); }
+            @Override public void onClear() { input.getText().clear(); }
+            @Override public void onSolve() { solve(); }
+        });
+        keypad.setBackground(Ui.roundedTop(Ui.color(this, R.color.surface_variant), Ui.dp(this, 28)));
+        col.addView(keypad, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return col;
     }
 
-    private void onKey(String insert) {
-        Editable text = input.getText();
-        if (DEL.equals(insert)) {
-            int s = input.getSelectionStart(), e = input.getSelectionEnd();
-            if (s < 0) s = text.length();
-            if (e < 0) e = s;
-            if (s != e) {
-                text.delete(Math.min(s, e), Math.max(s, e));
-            } else if (s > 0) {
-                text.delete(s - 1, s);
-            }
-            return;
-        }
-        if (CLR.equals(insert)) {
-            text.clear();
-            return;
-        }
+    private void insert(String text, int cursorBack) {
+        Editable t = input.getText();
         int s = input.getSelectionStart(), e = input.getSelectionEnd();
-        if (s < 0) s = text.length();
+        if (s < 0) s = t.length();
         if (e < 0) e = s;
         int start = Math.min(s, e), end = Math.max(s, e);
-        text.replace(start, end, insert);
-        input.setSelection(start + insert.length());
+        t.replace(start, end, text);
+        input.setSelection(Math.max(0, start + text.length() - cursorBack));
     }
 
-    // ---------- решение ----------
+    private void deleteBack() {
+        Editable t = input.getText();
+        int s = input.getSelectionStart(), e = input.getSelectionEnd();
+        if (s < 0) s = t.length();
+        if (e < 0) e = s;
+        if (s != e) {
+            t.delete(Math.min(s, e), Math.max(s, e));
+        } else if (s > 0) {
+            t.delete(s - 1, s);
+        }
+    }
+
+    private void clearResults() {
+        results.animate().alpha(0f).setDuration(140).withEndAction(new Runnable() {
+            @Override public void run() {
+                results.removeAllViews();
+                addWelcome();
+                results.setAlpha(1f);
+            }
+        }).start();
+    }
+
+    private void addWelcome() {
+        Cards.addWelcome(this, results, new Cards.Picker() {
+            @Override public void pick(String query) { openQuery(query, true); }
+        }, new Runnable() {
+            @Override public void run() { showScreen(SCREEN_EQUATIONS); }
+        });
+    }
+
+    /** Открывает калькулятор с готовым запросом (из меню, истории или примеров). */
+    private void openQuery(String query, boolean solveNow) {
+        showScreen(SCREEN_CALC);
+        input.setText(query);
+        input.setSelection(query.length());
+        if (solveNow) solve();
+    }
 
     private void solve() {
         String q = input.getText().toString().trim();
         if (q.isEmpty()) {
-            Toast.makeText(this, "Введите выражение или уравнение", Toast.LENGTH_SHORT).show();
+            Ui.shake(input);
+            Toast.makeText(this, R.string.empty_input, Toast.LENGTH_SHORT).show();
             return;
         }
-        history.remove(q);
-        history.add(0, q);
-        if (history.size() > 50) history.remove(history.size() - 1);
+        HistoryStore.add(this, q);
         try {
-            addResultCard(Solver.solve(q), q);
+            Cards.addResult(this, results, Solver.solve(q), q, 0);
         } catch (MathError e) {
-            addErrorCard(q, e.getMessage());
+            Cards.addError(this, results, q, e.getMessage(), 0);
         } catch (RuntimeException e) {
-            addErrorCard(q, "Не удалось решить: проверьте запись");
+            Cards.addError(this, results, q, "Не удалось решить: проверьте запись", 0);
         }
-        scroll.post(new Runnable() {
-            @Override public void run() { scroll.smoothScrollTo(0, 0); }
+        resultScroll.post(new Runnable() {
+            @Override public void run() { resultScroll.smoothScrollTo(0, 0); }
         });
     }
 
-    private void showHistory() {
-        if (history.isEmpty()) {
-            Toast.makeText(this, "История пуста", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("История")
-                .setItems(history.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        input.setText(history.get(which));
-                        input.setSelection(input.getText().length());
-                    }
-                })
-                .setNegativeButton("Закрыть", null)
-                .show();
-    }
+    // ---------- экраны «Уравнения» и «Примеры» ----------
 
-    // ---------- карточки ----------
-
-    private void addResultCard(Solver.Result res, String query) {
-        LinearLayout card = card();
-
-        TextView head = text(res.heading.toUpperCase(), 12, R.color.accent, true);
-        head.setLetterSpacing(0.08f);
-        card.addView(head);
-
-        TextView q = text(query, 16, R.color.on_surface_variant, false);
-        q.setTypeface(Typeface.MONOSPACE);
-        q.setPadding(0, dp(4), 0, dp(8));
-        q.setTextIsSelectable(true);
-        card.addView(q);
-
-        for (String ans : res.answers) {
-            TextView t = text(ans, 20, R.color.on_accent_container, true);
-            t.setTextIsSelectable(true);
-            t.setBackground(rounded(color(R.color.accent_container), dp(14)));
-            t.setPadding(dp(14), dp(10), dp(14), dp(10));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, dp(6), 0, dp(2));
-            card.addView(t, lp);
-        }
-
-        if (res.graph != null) {
-            GraphView gv = new GraphView(this, res.graph, res.marks,
-                    color(R.color.graph_grid), color(R.color.graph_axis),
-                    color(R.color.accent), color(R.color.graph_mark),
-                    color(R.color.on_surface_variant));
-            gv.setBackground(rounded(color(R.color.key_bg), dp(14)));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(230));
-            lp.setMargins(0, dp(10), 0, 0);
-            card.addView(gv, lp);
-        }
-
-        if (!res.steps.isEmpty()) {
-            TextView title = text("Решение по шагам", 14, R.color.on_surface, true);
-            title.setPadding(0, dp(14), 0, dp(4));
-            card.addView(title);
-            int n = 0;
-            for (String step : res.steps) {
-                boolean indented = step.startsWith(" ");
-                if (!indented) n++;
-                TextView t = text((indented ? "" : n + ". ") + step.trim(), 15, R.color.on_surface, false);
-                t.setPadding(indented ? dp(16) : 0, dp(3), 0, dp(3));
-                t.setLineSpacing(dp(2), 1f);
-                t.setTextIsSelectable(true);
-                card.addView(t);
+    private View buildCatalogScreen(Catalog.Section[] sections) {
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        col.setPadding(p, 0, p, Ui.dp(this, 28));
+        for (Catalog.Section section : sections) {
+            col.addView(Cards.sectionTitle(this, section.title));
+            for (final Catalog.Item item : section.items) {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.setMargins(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+                col.addView(Cards.row(this, item.expr, item.note, new View.OnClickListener() {
+                    @Override public void onClick(View v) { openQuery(item.expr, true); }
+                }), lp);
             }
         }
-        addCard(card);
+        sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return sv;
     }
 
-    private void addErrorCard(String query, String message) {
-        LinearLayout card = card();
-        TextView head = text("ОШИБКА", 12, R.color.error, true);
-        head.setLetterSpacing(0.08f);
-        card.addView(head);
-        TextView q = text(query, 16, R.color.on_surface_variant, false);
-        q.setTypeface(Typeface.MONOSPACE);
-        card.addView(q);
-        TextView m = text(message, 16, R.color.error, false);
-        m.setPadding(0, dp(8), 0, 0);
-        card.addView(m);
-        addCard(card);
+    // ---------- экран «История» ----------
+
+    private View buildHistoryScreen() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        historyList = new LinearLayout(this);
+        historyList.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        historyList.setPadding(p, Ui.dp(this, 4), p, Ui.dp(this, 16));
+        historyEmpty = Ui.text(this, getString(R.string.history_empty), 15, R.color.on_surface_variant, false);
+        historyEmpty.setGravity(Gravity.CENTER);
+        historyEmpty.setPadding(0, Ui.dp(this, 64), 0, 0);
+        sv.addView(historyList, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        col.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView clear = Ui.text(this, getString(R.string.clear_history), 15, R.color.error, true);
+        clear.setGravity(Gravity.CENTER);
+        clear.setPadding(0, Ui.dp(this, 14), 0, Ui.dp(this, 18));
+        clear.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 16), 0x22000000));
+        clear.setClickable(true);
+        clear.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                HistoryStore.clear(MainActivity.this);
+                refreshHistory();
+            }
+        });
+        col.addView(clear, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return col;
     }
 
-    private void addWelcomeCard() {
-        LinearLayout card = card();
-        TextView head = text("ВОЗМОЖНОСТИ", 12, R.color.accent, true);
-        head.setLetterSpacing(0.08f);
-        card.addView(head);
-        TextView t = text("Вычисляю выражения с пошаговым решением, решаю уравнения и системы, "
-                + "показываю график функции и отмечаю корни. Нажмите пример, чтобы решить его:", 15, R.color.on_surface, false);
-        t.setPadding(0, dp(6), 0, dp(8));
-        card.addView(t);
-        String[] examples = {
-            "2x² − 3x + 1 = 0",
-            "x³ − 6x² + 11x − 6 = 0",
-            "(2 + 3) · 4 ÷ 5 − 2^3",
-            "sin(x) = 0,5",
-            "x + y = 5; 2x − y = 1",
-            "√(x + 4) = 3",
-        };
-        for (String ex : examples) {
-            TextView e = text(ex, 16, R.color.accent, true);
-            e.setTypeface(Typeface.MONOSPACE);
-            e.setBackground(rounded(color(R.color.key_bg), dp(12)));
-            e.setPadding(dp(14), dp(10), dp(14), dp(10));
-            e.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    input.setText(ex);
-                    input.setSelection(ex.length());
-                    solve();
-                }
-            });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, dp(4), 0, dp(4));
-            card.addView(e, lp);
+    private void refreshHistory() {
+        historyList.removeAllViews();
+        List<String> items = HistoryStore.load(this);
+        if (items.isEmpty()) {
+            historyList.addView(historyEmpty);
+            return;
         }
-        addCard(card);
+        int index = 0;
+        for (final String q : items) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+            View row = Cards.row(this, q, null, new View.OnClickListener() {
+                @Override public void onClick(View v) { openQuery(q, true); }
+            });
+            historyList.addView(row, lp);
+            if (index < 12) Ui.appear(row, index * 30L);
+            index++;
+        }
     }
 
-    private void addCard(View card) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, dp(12));
-        results.addView(card, 0, lp);
-    }
+    // ---------- экран «Справка» ----------
 
-    private LinearLayout card() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16), dp(14), dp(16), dp(16));
-        card.setBackground(rounded(color(R.color.card), dp(20)));
-        return card;
-    }
-
-    private TextView text(String s, int sp, int colorRes, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        t.setTextColor(color(colorRes));
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setGravity(Gravity.START);
-        return t;
-    }
-
-    // ---------- утилиты ----------
-
-    private int color(int res) {
-        return getResources().getColor(res);
-    }
-
-    private int dp(float v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics());
-    }
-
-    private GradientDrawable rounded(int color, int radius) {
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.RECTANGLE);
-        g.setColor(color);
-        g.setCornerRadius(radius);
-        return g;
-    }
-
-    private RippleDrawable ripple(int color, int radius) {
-        return new RippleDrawable(ColorStateList.valueOf(0x33000000), rounded(color, radius), null);
+    private View buildHelpScreen() {
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        TextView t = Ui.text(this, getString(R.string.help_text), 15, R.color.on_surface, false);
+        t.setLineSpacing(Ui.dp(this, 3), 1f);
+        t.setTextIsSelectable(true);
+        int p = Ui.dp(this, 20);
+        t.setPadding(p, Ui.dp(this, 8), p, Ui.dp(this, 28));
+        sv.addView(t, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return sv;
     }
 }

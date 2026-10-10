@@ -20,8 +20,10 @@ public final class Parser {
         }
     }
 
+    private static final String SUPERSCRIPT = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
     private static final String[] WORDS = {
-        "asin", "acos", "atan", "sin", "cos", "tan", "ln", "log", "lg", "exp", "sqrt", "abs", "pi"
+        "asin", "acos", "atan", "sin", "cos", "tan", "ln", "log", "lg", "exp", "sqrt", "cbrt", "abs", "pi"
     };
 
     private final List<Tok> toks;
@@ -51,6 +53,17 @@ public final class Parser {
                 i++;
                 continue;
             }
+            if (SUPERSCRIPT.indexOf(c) >= 0) {
+                // степень из надстрочных цифр: x⁴ → x^4, x¹⁰ → x^10
+                StringBuilder exp = new StringBuilder();
+                while (i < n && SUPERSCRIPT.indexOf(s.charAt(i)) >= 0) {
+                    exp.append((char) ('0' + SUPERSCRIPT.indexOf(s.charAt(i))));
+                    i++;
+                }
+                out.add(new Tok(T.OP, "^"));
+                out.add(new Tok(T.NUM, exp.toString()));
+                continue;
+            }
             boolean decimalStart = (c == '.' || c == ',') && i + 1 < n && Character.isDigit(s.charAt(i + 1));
             if (Character.isDigit(c) || decimalStart) {
                 int st = i;
@@ -64,6 +77,11 @@ public final class Parser {
             }
             if (c == '√') {
                 out.add(new Tok(T.ID, "sqrt"));
+                i++;
+                continue;
+            }
+            if (c == '∛') {
+                out.add(new Tok(T.ID, "cbrt"));
                 i++;
                 continue;
             }

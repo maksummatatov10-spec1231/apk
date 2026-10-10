@@ -1,10 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Калькулятор и решатель</string>
-    <string name="input_hint">Например: 2x² − 3x + 1 = 0</string>
+    <string name="menu_calc">Калькулятор</string>
+    <string name="menu_equations">Уравнения</string>
+    <string name="menu_examples">Примеры</string>
+    <string name="menu_history">История</string>
+    <string name="menu_help">Справка</string>
+    <string name="drawer_subtitle">Решает уравнения и показывает шаги</string>
+    <string name="input_hint">Введите выражение или уравнение</string>
     <string name="solve">Решить</string>
-    <string name="history">История</string>
-    <string name="clear_results">Очистить</string>
-    <string name="keypad">⌨ Клавиши</string>
     <string name="results">Результаты</string>
+    <string name="clear">Очистить</string>
+    <string name="clear_history">Очистить историю</string>
+    <string name="history_empty">История пока пуста.\nРешённые примеры появятся здесь.</string>
+    <string name="copied">Скопировано</string>
+    <string name="empty_input">Введите выражение или уравнение</string>
+    <string name="tab_digits">Цифры</string>
+    <string name="tab_functions">Функции</string>
+    <string name="tab_symbols">Символы</string>
+    <string name="welcome_title">Что можно сделать</string>
+    <string name="welcome_text">Вычисляю выражения с пошаговым решением, решаю уравнения и системы, строю график функции и отмечаю корни.</string>
+    <string name="welcome_more">Все примеры — в разделах «Уравнения» и «Примеры» меню</string>
+    <string name="help_text">Как вводить
+• Цифры и знаки: + − × ÷ ^ ( ) — с клавиатуры или кнопками внизу.
+• Степени: x², x³, x⁴, x^5 или кнопка xⁿ.
+• Корни: √(x) и ∛(x).
+• Функции: sin, cos, tan, asin, acos, atan, ln, log (10), exp, |x|, n! (факториал), % (процент).
+• Константы: π и e.
+• Уравнение — знак «=». Система — уравнения через «;», например: x + y = 5; 2x − y = 1.
+• Если в выражении есть x без «=», строится график функции.
+
+Как решается
+• Выражения — пошагово: порядок действий, сокращение дробей, степени.
+• Уравнения — переносим всё в одну часть, раскладываем на множители или ищем корни численно, показываем ОДЗ и проверку.
+• Корни отмечаются на графике.
+
+Советы
+• Нажмите на ответ, чтобы скопировать его.
+• Нажмите на пример, чтобы решить его сразу.
+• История сохраняется между запусками.</string>
 </resources>
