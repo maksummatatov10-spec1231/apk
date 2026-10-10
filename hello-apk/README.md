@@ -19,7 +19,7 @@ scripts/
 ## Быстрый старт
 
 ```bash
-./scripts/setup-toolchain.sh   # один раз: скачивает инструменты
+../tools/setup-toolchain.sh   # один раз: скачивает инструменты
 ./scripts/build-apk.sh         # собирает build/hello.apk
 ```
 

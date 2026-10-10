@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Калькулятор и решатель</string>
+    <string name="input_hint">Например: 2x² − 3x + 1 = 0</string>
+    <string name="solve">Решить</string>
+    <string name="history">История</string>
+    <string name="clear_results">Очистить</string>
+    <string name="keypad">⌨ Клавиши</string>
+    <string name="results">Результаты</string>
+</resources>

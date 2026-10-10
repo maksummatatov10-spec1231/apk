@@ -30,7 +30,7 @@ java -jar "$T/apktool.jar" b "$HERE/app" --use-aapt2 -p "$OUT/framework" \
   -o "$OUT/unsigned.apk"
 
 echo "==> Подпись (v1)"
-python3 "$HERE/scripts/sign_apk.py" "$OUT/unsigned.apk" "$OUT/hello.apk" \
+python3 "$HERE/../tools/sign_apk.py" "$OUT/unsigned.apk" "$OUT/hello.apk" \
   "$KEYDIR/key.pem" "$KEYDIR/cert.pem"
 
 echo "==> Проверка подписи"

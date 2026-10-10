@@ -70,16 +70,28 @@ def main() -> None:
         )
         rsa_bytes = rsa_path.read_bytes()
 
-    # 4. Пересборка APK: META-INF первыми, затем исходные записи без изменений
+    # 4. Пересборка APK: META-INF первыми, затем исходные записи.
+    # Несжатые записи (resources.arsc, .so) выравниваются по 4 байта — требуется для targetSdk >= 30.
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         zout.writestr("META-INF/MANIFEST.MF", manifest_bytes)
         zout.writestr("META-INF/CERT.SF", sf_bytes)
         zout.writestr("META-INF/CERT.RSA", rsa_bytes)
         for name in sorted(contents):
             info = infos[name]
-            # resources.arsc и сжатые файлы сохраняем как есть (без выравнивания)
-            ctype = zipfile.ZIP_STORED if info.compress_type == zipfile.ZIP_STORED else zipfile.ZIP_DEFLATED
-            zout.writestr(name, contents[name], compress_type=ctype)
+            if info.compress_type == zipfile.ZIP_STORED:
+                zi = zipfile.ZipInfo(name, date_time=info.date_time)
+                zi.compress_type = zipfile.ZIP_STORED
+                zi.external_attr = 0o644 << 16
+                header = zout.fp.tell() + 30 + len(name.encode("utf-8"))
+                pad = (-header) % 4
+                if pad in (1, 2, 3):
+                    pad += 4
+                if pad:
+                    # extra-поле: id 0xD935 (выравнивание), длина pad-4
+                    zi.extra = b"\xd9\x35" + (pad - 4).to_bytes(2, "little") + b"\x00" * (pad - 4)
+                zout.writestr(zi, contents[name])
+            else:
+                zout.writestr(name, contents[name], compress_type=zipfile.ZIP_DEFLATED)
 
     print(f"Подписано (v1): {dst}")
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Запасная палитра (Android < 12). На Android 12+ см. values-v31. -->
+    <color name="surface">#FBF8FD</color>
+    <color name="card">#F3EDF7</color>
+    <color name="surface_variant">#E7E0EC</color>
+    <color name="key_bg">#FFFFFF</color>
+    <color name="on_surface">#1C1B1F</color>
+    <color name="on_surface_variant">#49454F</color>
+    <color name="accent">#6750A4</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="accent_container">#EADDFF</color>
+    <color name="on_accent_container">#21005D</color>
+    <color name="error">#B3261E</color>
+    <color name="graph_grid">#1F000000</color>
+    <color name="graph_axis">#8A7F8C</color>
+    <color name="graph_mark">#E53935</color>
+</resources>
