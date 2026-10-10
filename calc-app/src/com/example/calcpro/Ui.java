@@ -7,6 +7,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.util.TypedValue;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
@@ -74,6 +76,44 @@ final class Ui {
                         break;
                 }
                 return false;
+            }
+        });
+    }
+
+    /**
+     * Удержание кнопки: сразу один вызов action, затем повтор. Пауза перед повтором — 400 мс,
+     * далее интервал сокращается от 120 мс до 30 мс, как у Backspace на ПК.
+     */
+    static void hold(final View v, final Runnable action) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        final long[] interval = {0};
+        final Runnable[] tick = new Runnable[1];
+        tick[0] = new Runnable() {
+            @Override public void run() {
+                action.run();
+                interval[0] = interval[0] == 400 ? 120 : Math.max(30, (long) (interval[0] * 0.9));
+                handler.postDelayed(this, interval[0]);
+            }
+        };
+        v.setOnTouchListener(new View.OnTouchListener() {
+            @Override public boolean onTouch(View view, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        view.animate().scaleX(0.93f).scaleY(0.93f).setDuration(90).start();
+                        action.run();
+                        interval[0] = 400;
+                        handler.removeCallbacks(tick[0]);
+                        handler.postDelayed(tick[0], 400);
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        handler.removeCallbacks(tick[0]);
+                        view.animate().scaleX(1f).scaleY(1f).setDuration(260)
+                                .setInterpolator(new OvershootInterpolator(2.2f)).start();
+                        return true;
+                    default:
+                        return true;
+                }
             }
         });
     }

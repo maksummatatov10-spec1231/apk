@@ -169,10 +169,16 @@ final class KeypadView extends LinearLayout {
         t.setTextColor(text);
         if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setBackground(Ui.ripple(bg, radius, ripple));
-        Ui.press(t);
-        t.setOnClickListener(new OnClickListener() {
-            @Override public void onClick(View v) { dispatch(key); }
-        });
+        if ("⌫".equals(key.label)) {
+            Ui.hold(t, new Runnable() {
+                @Override public void run() { dispatch(key); }
+            });
+        } else {
+            Ui.press(t);
+            t.setOnClickListener(new OnClickListener() {
+                @Override public void onClick(View v) { dispatch(key); }
+            });
+        }
         return t;
     }
 

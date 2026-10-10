@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
     static final int SCREEN_HELP = SCREEN_HISTORY + 1;
     static final int SCREEN_COUNT = SCREEN_HELP + 1;
 
-    private static final int PANEL_HEIGHT_DP = 360;
+    private static final int PANEL_HEIGHT_DP = 420;
 
     private SideDrawer drawer;
     private HamburgerView hamburger;
@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private LinearLayout keypadBox;
     private ImageView keypadToggle;
     private boolean keypadOpen;
+    private String lastAnswer;   // последний числовой ответ для кнопки «Ans»
     private LinearLayout historyList;
     private TextView historyEmpty;
 
@@ -390,9 +391,79 @@ public class MainActivity extends Activity {
             @Override public void onSolve() { solve(); }
         });
         keypadBox.addView(keypad, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        keypadBox.addView(buildUtilityRow(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         keypadBox.setVisibility(View.GONE);
         col.addView(keypadBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return col;
+    }
+
+    /** Служебная строка под клавиатурой: курсор влево/вправо (с повтором) и «Ans». */
+    private View buildUtilityRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        int m = Ui.dp(this, 3);
+        row.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 8));
+
+        TextView left = utilityKey("←");
+        Ui.hold(left, new Runnable() {
+            @Override public void run() { moveCursor(-1); }
+        });
+        TextView right = utilityKey("→");
+        Ui.hold(right, new Runnable() {
+            @Override public void run() { moveCursor(1); }
+        });
+        TextView ans = utilityKey("Ans");
+        ans.setContentDescription("Подставить предыдущий ответ");
+        ans.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { insertAns(); }
+        });
+        Ui.press(ans);
+
+        row.addView(left, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1f));
+        row.addView(right, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1f));
+        LinearLayout.LayoutParams ansLp = new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 2f);
+        row.addView(ans, ansLp);
+        for (int i = 0; i < row.getChildCount(); i++) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) row.getChildAt(i).getLayoutParams();
+            lp.setMargins(m, 0, m, 0);
+        }
+        return row;
+    }
+
+    private TextView utilityKey(String label) {
+        TextView t = Ui.text(this, label, 16, R.color.on_surface, true);
+        t.setGravity(Gravity.CENTER);
+        t.setClickable(true);
+        t.setBackground(Ui.ripple(Ui.color(this, R.color.key_func), Ui.dp(this, 14), 0x33000000));
+        return t;
+    }
+
+    private void moveCursor(int delta) {
+        int pos = input.getSelectionStart();
+        if (pos < 0) pos = input.getText().length();
+        int next = Math.max(0, Math.min(input.getText().length(), pos + delta));
+        input.setSelection(next);
+    }
+
+    private void insertAns() {
+        if (lastAnswer == null) {
+            Toast.makeText(this, "Пока нет числового ответа", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        insert(lastAnswer, 0);
+    }
+
+    /** Запоминает число из ответа «Ответ: …» для кнопки «Ans». */
+    private void rememberAnswer(Solver.Result res) {
+        if (res.answers.isEmpty()) return;
+        String a = res.answers.get(0);
+        String prefix = "Ответ: ";
+        if (!a.startsWith(prefix)) return;
+        String v = a.substring(prefix.length());
+        int approx = v.indexOf(" ≈");
+        if (approx >= 0) v = v.substring(0, approx);
+        v = v.replace('−', '-').replace(',', '.').trim();
+        lastAnswer = "(" + v + ")";
     }
 
     private View buildHandle() {
@@ -495,7 +566,9 @@ public class MainActivity extends Activity {
         }
         HistoryStore.add(this, q);
         try {
-            Cards.addResult(this, results, Solver.solve(q), q, 0);
+            Solver.Result res = Solver.solve(q);
+            rememberAnswer(res);
+            Cards.addResult(this, results, res, q, 0);
         } catch (MathError e) {
             Cards.addError(this, results, q, e.getMessage(), 0);
         } catch (RuntimeException e) {

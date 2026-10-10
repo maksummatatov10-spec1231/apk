@@ -416,12 +416,18 @@ public final class Solver {
         Poly inner;
         Poly p;
         int n;
+        List<Poly> domain = new ArrayList<>(); // подкоренные выражения √ — должны быть ≥ 0
+        Poly nonneg = null;                    // правая часть одиночного √ — тоже ≥ 0
         if (isRadical(left) && isRadical(right) && left.name.equals(right.name)) {
             // √(A) = √(B): под корнями одинаковой степени — приравниваем подкоренные выражения
             inner = left.a.toPoly();
             p = right.a.toPoly();
             n = 1;
             if (inner == null || p == null) return false;
+            if ("sqrt".equals(left.name)) {
+                domain.add(inner);
+                domain.add(p);
+            }
             r.steps.add("Корни одинаковой степени: приравниваем подкоренные выражения.");
         } else {
             Node rad;
@@ -439,6 +445,10 @@ public final class Solver {
             p = other.toPoly();
             if (inner == null || p == null) return false;
             n = "sqrt".equals(rad.name) ? 2 : 3;
+            if (n == 2) {
+                domain.add(inner);
+                nonneg = p;
+            }
             r.steps.add("Избавляемся от корня " + ("sqrt".equals(rad.name) ? "√" : "∛")
                     + ": возводим обе части в степень " + n + ".");
         }
@@ -460,9 +470,21 @@ public final class Solver {
         List<Double> xs = new ArrayList<>();
         for (double[] c : cands) {
             if (Math.abs(c[1]) > 1e-7) continue;          // только действительные корни
-            Double v = evalAt(f, c[0]);
-            if (v == null || Math.abs(v) > 1e-6) continue; // подстановка в исходное уравнение
-            addRoot(xs, c[0]);
+            double x = c[0];
+            // Корень, близкий к целому (например 2 - 1e-16), снапим: иначе подкоренное выражение
+            // становится чуть отрицательным и корень даёт NaN, и верный корень теряется.
+            double nearest = Math.rint(x);
+            if (Math.abs(x - nearest) < 1e-9) x = nearest;
+            Double v = evalAt(f, x);
+            boolean valid;
+            if (v != null) {
+                valid = Math.abs(v) <= 1e-6;                // подстановка в исходное уравнение
+            } else {
+                // NaN от √ из-за погрешности -1e-16: проверяем область определения алгебраически
+                valid = inDomain(domain, x) && (nonneg == null || polyAt(nonneg, x) >= -1e-9);
+            }
+            if (!valid) continue;
+            addRoot(xs, x);
         }
         if (xs.isEmpty()) {
             r.steps.add("Подстановка в исходное уравнение отсекла все корни: решений нет.");
@@ -476,6 +498,19 @@ public final class Solver {
             boolean integer = Math.abs(x - nearest) < 1e-6;
             r.answers.add(integer ? "x = " + Fmt.num(nearest) : "x ≈ " + Fmt.num(x));
             r.marks.add(x);
+        }
+        return true;
+    }
+
+    private static double polyAt(Poly p, double x) {
+        double acc = 0;
+        for (int i = p.size() - 1; i >= 0; i--) acc = acc * x + p.coef(i).toDouble();
+        return acc;
+    }
+
+    private static boolean inDomain(List<Poly> domain, double x) {
+        for (Poly d : domain) {
+            if (polyAt(d, x) < -1e-9) return false;
         }
         return true;
     }

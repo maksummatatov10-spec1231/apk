@@ -88,6 +88,17 @@ SUITE = [
     ("√(x) = √(x + 1)", "nosolution"),
     ("∛(x) = 2", "radical"),
     ("∛(x + 1) = 3", "radical"),
+    # радикалы с двумя корнями и с отбором по области определения
+    ("√(x^2 − 5x + 6) = √(2x − 4)", "radical"),
+    ("√(x^2 − 4) = √(x + 2)", "radical"),
+    ("√(x^2 − 1) = √(3x + 5)", "radical"),
+    ("√(x + 2) = √(2x − 1)", "radical"),
+    ("√(x^2 − 9) = √(x + 3)", "radical"),
+    ("√(x^2 − 3x) = √(x − 1)", "radical"),
+    ("∛(x^2 − 1) = ∛(2x + 7)", "radical"),
+    ("√(x^2 − 6x + 9) = 2", "radical"),
+    ("√(x^2) = 3", "radical"),
+    ("√(x + 4) = √(x^2 − 2)", "radical"),
     # --- тригонометрия ---
     ("sin(x) = 0,5", "numeric"),
     ("cos(x) = 0", "numeric"),
@@ -285,12 +296,34 @@ def truth_system(q):
 
 def truth_radical(q):
     left, right = split_eq(q)
-    sols = sp.solve(sp.Eq(to_sympy(left), to_sympy(right)), x)
+    lhs, rhs = to_sympy(left), to_sympy(right)
+    third = sp.Rational(1, 3)
+    # Кубический корень (вещественный): ∛A = ∛B ⇔ A = B, ∛A = c ⇔ A = c³.
+    # Подстановку для ∛ не используем: главная ветвь sympy даёт комплексное значение для отрицательных.
+    if (lhs.is_Pow and lhs.exp == third) or (rhs.is_Pow and rhs.exp == third):
+        a_expr = lhs.base if (lhs.is_Pow and lhs.exp == third) else lhs ** 3
+        b_expr = rhs.base if (rhs.is_Pow and rhs.exp == third) else rhs ** 3
+        real = []
+        for sol in sp.solve(sp.Eq(a_expr, b_expr), x):
+            v = complex(sp.N(sol, 30))
+            if abs(v.imag) < 1e-12:
+                real.append(v)
+        return real
+    sols = sp.solve(sp.Eq(lhs, rhs), x)
     real = []
     for sol in sols:
         v = complex(sp.N(sol, 30))
-        if abs(v.imag) < 1e-12:
-            real.append(v)
+        if abs(v.imag) > 1e-12:
+            continue
+        # sympy не проверяет область определения корней: подставляем в исходное уравнение
+        try:
+            a = complex(sp.N(lhs.subs(x, sol), 30))
+            b = complex(sp.N(rhs.subs(x, sol), 30))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if abs(a.imag) > 1e-12 or abs(b.imag) > 1e-12 or abs(a.real - b.real) > 1e-9:
+            continue
+        real.append(v)
     return real
 
 
