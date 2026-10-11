@@ -104,6 +104,10 @@ public final class Rational implements Comparable<Rational> {
     }
 
     public double toDouble() {
+        // быстрый путь: оба числа точно представимы в double, их деление даёт правильно округлённый результат
+        if (num.bitLength() <= 53 && den.bitLength() <= 53) {
+            return num.doubleValue() / den.doubleValue();
+        }
         return new BigDecimal(num).divide(new BigDecimal(den), MathContext.DECIMAL64).doubleValue();
     }
 

@@ -12,7 +12,7 @@ APK-файлы приложений репозитория. Все подпис�
 
 ```
 66a9342dfee7fc25311be50cce97d92f36d101ba61203b96b7ac67712484b59a  AirHotkeyChallenge-v1.0.apk
-97b8fbfdf47c4aec983cec0c04590843bd67d489b624062b83e6d92852082af4  CalcSolver-v1.1.apk
+9b6b0a3df04ef33157e2815d8dc5ebef5ff1168cf2aebe600f460ec95825693b  CalcSolver-v1.1.apk
 337a533a4ef98d4126a08b2a9488098923c54c48351150c76b0dbc0e8a92207d  Hello-v1.0.apk
 ```
 

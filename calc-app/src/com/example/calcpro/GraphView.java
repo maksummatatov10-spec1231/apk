@@ -50,6 +50,14 @@ public final class GraphView extends View {
     private float lastX, lastY;
     private boolean dragging;
 
+    /** Кэш кривых в координатах вида. На время жеста кэш сдвигается/масштабируется матрицей, без пересчёта. */
+    private final List<Path> cachedPaths = new ArrayList<>();
+    private final List<Integer> cachedColors = new ArrayList<>();
+    private boolean cacheValid;
+    private boolean interacting;
+    private double cXMin, cXMax, cYMin, cYMax;
+    private float cL, cT, cR, cB;
+
     public GraphView(Context ctx, List<Node> funcs, List<Node> implicits, List<double[]> points, List<Double> marks,
                      int gridColor, int axisColor, int[] curveColors, int markColor, int textColor) {
         super(ctx);
@@ -185,10 +193,12 @@ public final class GraphView extends View {
                 lastX = e.getX();
                 lastY = e.getY();
                 dragging = true;
+                interacting = true;
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
                 dragging = false;
+                interacting = true;
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (dragging && !scaleDetector.isInProgress() && e.getPointerCount() == 1) {
@@ -200,7 +210,9 @@ public final class GraphView extends View {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 dragging = false;
+                interacting = false;
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                invalidate();   // после жеста пересчитываем кривые в точном виде
                 break;
             default:
                 break;
@@ -259,15 +271,30 @@ public final class GraphView extends View {
         if (xMin <= 0 && xMax >= 0) c.drawLine(sx(0, left, right), top, sx(0, left, right), bottom, axisPaint);
         if (yMin <= 0 && yMax >= 0) c.drawLine(left, sy(0, top, bottom), right, sy(0, top, bottom), axisPaint);
 
-        int k = 0;
-        for (Node f : funcs) {
-            setCurveColor(color(k++));
-            c.drawPath(functionPath(f, left, right, top, bottom), curvePaint);
+        boolean same = cacheValid && cXMin == xMin && cXMax == xMax && cYMin == yMin && cYMax == yMax
+                && cL == left && cT == top && cR == right && cB == bottom;
+        if (!cacheValid || (!same && !interacting)) {
+            rebuildCache(left, top, right, bottom);
+            same = true;
         }
-        for (Node f : implicits) {
-            setCurveColor(color(k++));
-            c.drawPath(implicitPath(f, left, right, top, bottom), curvePaint);
+        c.save();
+        c.clipRect(left, top, right, bottom);
+        if (same) {
+            drawCache(c);
+        } else {
+            // жест: кэш переводится в текущий вид линейным преобразованием, без пересчёта кривых
+            double dx = xMax - xMin, dy = yMax - yMin;
+            float W = right - left, H = bottom - top;
+            float cW = cR - cL, cH = cB - cT;
+            float ax = (float) ((cXMax - cXMin) * W / (cW * dx));
+            float ay = (float) ((cYMax - cYMin) * H / (cH * dy));
+            float bx = (float) (left + (cXMin - xMin) * W / dx - cL * ax);
+            float by = (float) (top + (yMax - cYMax) * H / dy - cT * ay);
+            c.translate(bx, by);
+            c.scale(ax, ay);
+            drawCache(c);
         }
+        c.restore();
 
         for (double m : marks) {
             if (m < xMin || m > xMax) continue;
@@ -281,13 +308,39 @@ public final class GraphView extends View {
         }
     }
 
+    private void rebuildCache(float left, float top, float right, float bottom) {
+        cachedPaths.clear();
+        cachedColors.clear();
+        int k = 0;
+        for (Node f : funcs) {
+            cachedPaths.add(functionPath(f, left, right, top, bottom));
+            cachedColors.add(color(k++));
+        }
+        for (Node f : implicits) {
+            cachedPaths.add(implicitPath(f, left, right, top, bottom));
+            cachedColors.add(color(k++));
+        }
+        cXMin = xMin;
+        cXMax = xMax;
+        cYMin = yMin;
+        cYMax = yMax;
+        cL = left;
+        cT = top;
+        cR = right;
+        cB = bottom;
+        cacheValid = true;
+    }
+
+    private void drawCache(Canvas c) {
+        for (int i = 0; i < cachedPaths.size(); i++) {
+            curvePaint.setColor(cachedColors.get(i));
+            c.drawPath(cachedPaths.get(i), curvePaint);
+        }
+    }
+
     private int color(int i) {
         if (curveColors == null || curveColors.length == 0) return 0xFF4FC3F7;
         return curveColors[i % curveColors.length];
-    }
-
-    private void setCurveColor(int color) {
-        curvePaint.setColor(color);
     }
 
     /** Кривая y = f(x); разрывы (асимптоты, пропуски) рисуем отдельными отрезками. */
