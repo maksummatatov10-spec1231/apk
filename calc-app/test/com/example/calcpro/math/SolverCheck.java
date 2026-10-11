@@ -99,7 +99,20 @@ public final class SolverCheck {
         expectAnswer("x + y + z = 6\n2x − y + z = 3\nx + 2y − z = 2", "x = 1");
         expectAnswer("x + y + z = 6\n2x − y + z = 3\nx + 2y − z = 2", "y = 2");
         expectAnswer("x + y + z = 6\n2x − y + z = 3\nx + 2y − z = 2", "z = 3");
-        expectAnswer("x + y = 1; 2x + 2y = 2", "D = 0");
+        expectAnswer("x + y = 1; 2x + 2y = 2", "x = 1 − y");
+        expectAnswer("x + y = 1; 2x + 2y = 2", "y — любое число");
+
+        System.out.println("Системы: несовместные и с избытком уравнений (Гаусс):");
+        expectAnswer("y=0\nx=0\nx+y=4", "Решений нет");
+        expectAnswer("y=0\nx=0\nx+y=0", "x = 0");
+        expectAnswer("y=0\nx=0\nx+y=0", "y = 0");
+        expectAnswer("x + y = 4; x − y = 2", "x = 3");
+        expectAnswer("x + y = 4; x − y = 2", "y = 1");
+        expectAnswer("x + y = 4; x − y = 2; 2x = 6", "x = 3");
+        expectAnswer("x + y = 4; x − y = 2; 2x = 7", "Решений нет");
+        expectAnswer("x + y + z = 1; x − z = 0", "x = z");
+        expectAnswer("x + y + z = 1; x − z = 0", "y = 1 − 2·z");
+        expectAnswer("x + y = 4", "x = 4 − y");
 
         System.out.println("Ошибки ввода:");
         expectError("x = 1 = 2");

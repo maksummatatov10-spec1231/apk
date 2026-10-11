@@ -24,6 +24,10 @@ public final class Solver {
         public final List<Double> marks = new ArrayList<>();
         /** Запись для тетради: только уравнения, неравенства и ответы, без пояснений. */
         public final List<String> notebook = new ArrayList<>();
+        /** Уравнения F(x, y) = 0 для графика (две переменные). */
+        public final List<Node> implicit = new ArrayList<>();
+        /** Точки пересечения (x, y) для графика. */
+        public final List<double[]> points = new ArrayList<>();
     }
 
     private Solver() {}
@@ -38,6 +42,7 @@ public final class Solver {
             if (!p.trim().isEmpty()) parts.add(p.trim());
         }
         if (parts.size() >= 2) return solveSystem(parts);
+        if (s.indexOf('=') >= 0 && s.indexOf('y') >= 0) return solveSystem(parts);
         if (s.indexOf('=') >= 0) {
             Matcher m = GRAPH_FORM.matcher(s);
             if (m.matches()) return solveGraphForm(m.group(1));
@@ -766,17 +771,15 @@ public final class Solver {
             if (!vars.contains(v)) throw new MathError("В системе допустимы переменные x, y, z");
         }
         int n = vars.size();
+        int m = fs.size();
         if (n == 0) throw new MathError("В системе нет переменных");
-        if (fs.size() != n) {
-            throw new MathError("Уравнений: " + fs.size() + ", переменных: " + n + ". Для единственного решения их должно быть поровну");
-        }
 
         r.steps.add("Исходная система:");
         for (String line : lines) r.steps.add("   " + line);
 
-        Rational[][] a = new Rational[n][n];
-        Rational[] b = new Rational[n];
-        for (int i = 0; i < n; i++) {
+        Rational[][] a = new Rational[m][n];
+        Rational[] b = new Rational[m];
+        for (int i = 0; i < m; i++) {
             Node f = fs.get(i);
             Map<String, Rational> zero = new HashMap<>();
             for (String v : vars) zero.put(v, Rational.ZERO);
@@ -789,7 +792,7 @@ public final class Solver {
                 if (v1 == null) throw new MathError("Система должна быть линейной с рациональными коэффициентами");
                 a[i][j] = v1.sub(c0);
             }
-            // проверка линейности: подставляем точку (2, 3, 5)
+            // проверка линейности: подставляем точку (2, 3, 5, ...)
             Map<String, Rational> test = new HashMap<>();
             Rational expect = c0;
             for (int j = 0; j < n; j++) {
@@ -803,15 +806,30 @@ public final class Solver {
         }
 
         r.steps.add("Приводим к виду a·x + b·y + … = c:");
-        for (int i = 0; i < n; i++) r.steps.add("   " + rowText(a[i], vars) + " = " + Fmt.rat(b[i]));
-
-        Rational d = det(a, n);
-        r.steps.add("Определитель матрицы коэффициентов: D = " + Fmt.rat(d));
-        if (d.isZero()) {
-            r.answers.add("D = 0 — единственного решения нет (система несовместна или имеет бесконечно много решений)");
-            return r;
+        for (int i = 0; i < m; i++) r.steps.add("   " + rowText(a[i], vars) + " = " + Fmt.rat(b[i]));
+        if (n == 2 && vars.contains("x") && vars.contains("y")) {
+            for (Node f : fs) r.implicit.add(f);
         }
+
+        if (m == n) {
+            Rational d = det(a, n);
+            r.steps.add("Определитель матрицы коэффициентов: D = " + Fmt.rat(d));
+            if (!d.isZero()) {
+                cramer(a, b, n, vars, d, r);
+                return r;
+            }
+            r.steps.add("D = 0, поэтому метод Крамера не применим. Решаем методом Гаусса.");
+        } else {
+            r.steps.add("Уравнений: " + m + ", переменных: " + n + ". Решаем методом Гаусса (исключением переменных).");
+        }
+        gauss(a, b, m, n, vars, lines, r);
+        return r;
+    }
+
+    /** Крамер для системы с ненулевым определителем. */
+    private static void cramer(Rational[][] a, Rational[] b, int n, List<String> vars, Rational d, Result r) {
         r.steps.add("Метод Крамера: x = Dx / D, где Dx — определитель, в котором столбец x заменён столбцом свободных членов.");
+        List<String> notes = new ArrayList<>();
         for (int j = 0; j < n; j++) {
             Rational[][] m = new Rational[n][n];
             for (int i = 0; i < n; i++)
@@ -822,9 +840,125 @@ public final class Solver {
             r.steps.add("D" + vars.get(j) + " = " + Fmt.rat(dj) + ";   " + vars.get(j) + " = " + Fmt.rat(dj)
                     + " / " + Fmt.par(d) + " = " + Fmt.ratApprox(xj));
             r.answers.add(vars.get(j) + " = " + Fmt.ratApprox(xj));
+            notes.add(vars.get(j) + " = " + Fmt.ratApprox(xj));
             r.marks.add(xj.toDouble());
         }
-        return r;
+        if (n == 2) r.points.add(new double[]{r.marks.get(0), r.marks.get(1)});
+        r.notebook.add("Ответ: " + String.join(";  ", notes));
+    }
+
+    /**
+     * Метод Гаусса в точной арифметике. Классифицирует систему: единственное решение,
+     * решений нет (противоречивая строка 0 = c, c ≠ 0), бесконечно много (есть свободные переменные).
+     */
+    private static void gauss(Rational[][] a, Rational[] b, int m, int n, List<String> vars,
+                              List<String> lines, Result r) {
+        r.steps.add("Расширенная матрица приводится к ступенчатому виду: сначала выбираем ведущий элемент в столбце, затем обнуляем остальные строки.");
+        int row = 0;
+        List<Integer> pivots = new ArrayList<>();
+        for (int col = 0; col < n && row < m; col++) {
+            int p = -1;
+            for (int i = row; i < m; i++) {
+                if (!a[i][col].isZero()) { p = i; break; }
+            }
+            if (p < 0) continue;
+            if (p != row) {
+                Rational[] tr = a[row]; a[row] = a[p]; a[p] = tr;
+                Rational tb = b[row]; b[row] = b[p]; b[p] = tb;
+                r.steps.add("Меняем местами строки " + (row + 1) + " и " + (p + 1) + ".");
+            }
+            Rational k = a[row][col];
+            if (!k.equals(Rational.ONE)) {
+                for (int j = 0; j < n; j++) a[row][j] = a[row][j].div(k);
+                b[row] = b[row].div(k);
+                r.steps.add("Делим строку " + (row + 1) + " на " + Fmt.par(k) + ": " + rowText(a[row], vars)
+                        + " = " + Fmt.rat(b[row]));
+            }
+            for (int i = 0; i < m; i++) {
+                if (i == row || a[i][col].isZero()) continue;
+                Rational f = a[i][col];
+                for (int j = 0; j < n; j++) a[i][j] = a[i][j].sub(f.mul(a[row][j]));
+                b[i] = b[i].sub(f.mul(b[row]));
+                r.steps.add("Строка " + (i + 1) + " − " + Fmt.par(f) + " · строка " + (row + 1) + ": "
+                        + rowText(a[i], vars) + " = " + Fmt.rat(b[i]));
+            }
+            pivots.add(col);
+            row++;
+        }
+
+        int rank = pivots.size();
+        r.steps.add("Ступенчатый вид:");
+        for (int i = 0; i < m; i++) {
+            String left = rowText(a[i], vars);
+            r.steps.add("   " + (left.isEmpty() ? "0" : left) + " = " + Fmt.rat(b[i]));
+        }
+
+        for (int i = rank; i < m; i++) {
+            if (!b[i].isZero()) {
+                r.steps.add("Строка " + (i + 1) + " даёт 0 = " + Fmt.rat(b[i]) + " — противоречие.");
+                r.answers.add("Решений нет: система несовместна");
+                r.notebook.add("Ответ: решений нет");
+                return;
+            }
+        }
+
+        if (rank == n) {
+            List<String> notes = new ArrayList<>();
+            for (int j = 0; j < n; j++) {
+                String s = vars.get(j) + " = " + Fmt.ratApprox(b[j]);
+                r.steps.add(s);
+                r.answers.add(s);
+                notes.add(vars.get(j) + " = " + Fmt.rat(b[j]));
+                r.marks.add(b[j].toDouble());
+            }
+            if (n == 2) r.points.add(new double[]{r.marks.get(0), r.marks.get(1)});
+            r.notebook.add("Ответ: " + String.join(";  ", notes));
+            return;
+        }
+
+        List<String> free = new ArrayList<>();
+        List<Integer> freeCols = new ArrayList<>();
+        for (int j = 0; j < n; j++) {
+            if (!pivots.contains(j)) { free.add(vars.get(j)); freeCols.add(j); }
+        }
+        r.steps.add("Свободные переменные: " + String.join(", ", free) + ". Выражаем ведущие через них:");
+        List<String> notes = new ArrayList<>();
+        for (int i = 0; i < rank; i++) {
+            List<Rational> coefs = new ArrayList<>();
+            for (int j : freeCols) coefs.add(a[i][j].neg());
+            String expr = affine(b[i], coefs, free);
+            String s = vars.get(pivots.get(i)) + " = " + expr;
+            r.steps.add(s);
+            r.answers.add(s);
+            notes.add(s);
+        }
+        for (String f : free) {
+            r.answers.add(f + " — любое число");
+            notes.add(f + " — любое");
+        }
+        r.notebook.add("Ответ: " + String.join(";  ", notes));
+    }
+
+    /** c + k1·v1 + k2·v2 … текстом (знаки, без лишних единиц). */
+    private static String affine(Rational c, List<Rational> k, List<String> names) {
+        StringBuilder sb = new StringBuilder();
+        boolean anyTerm = false;
+        for (Rational t : k) if (!t.isZero()) anyTerm = true;
+        if (!c.isZero() || !anyTerm) sb.append(Fmt.rat(c));
+        for (int j = 0; j < k.size(); j++) {
+            Rational t = k.get(j);
+            if (t.isZero()) continue;
+            boolean neg = t.signum() < 0;
+            Rational abs = t.abs();
+            if (sb.length() == 0) {
+                if (neg) sb.append('−');
+            } else {
+                sb.append(neg ? " − " : " + ");
+            }
+            if (!abs.equals(Rational.ONE)) sb.append(Fmt.rat(abs)).append('·');
+            sb.append(names.get(j));
+        }
+        return sb.toString();
     }
 
     private static String rowText(Rational[] row, List<String> vars) {

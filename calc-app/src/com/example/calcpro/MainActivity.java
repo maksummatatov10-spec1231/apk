@@ -308,7 +308,7 @@ public class MainActivity extends Activity {
         input.setBackground(null);
         input.setGravity(Gravity.TOP | Gravity.START);
         input.setMinLines(2);
-        input.setMaxLines(4);
+        input.setMaxLines(6);
         input.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);

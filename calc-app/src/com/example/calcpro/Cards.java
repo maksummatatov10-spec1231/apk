@@ -12,6 +12,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.example.calcpro.math.Node;
 import com.example.calcpro.math.Solver;
 
 /** Построение карточек: результаты, ошибки, строки списков. */
@@ -62,16 +66,23 @@ final class Cards {
             card.addView(t, lp);
         }
 
-        if (res.graph != null) {
-            GraphView gv = new GraphView(c, res.graph, res.marks,
+        if (res.graph != null || !res.implicit.isEmpty() || !res.points.isEmpty()) {
+            List<Node> funcs = new ArrayList<>();
+            if (res.graph != null) funcs.add(res.graph);
+            int[] palette = {
+                    Ui.color(c, R.color.accent), 0xFFFFB74D, 0xFF81C784, 0xFFBA68C8, 0xFF4DD0E1, 0xFFF06292};
+            GraphView gv = new GraphView(c, funcs, res.implicit, res.points, res.marks,
                     Ui.color(c, R.color.graph_grid), Ui.color(c, R.color.graph_axis),
-                    Ui.color(c, R.color.accent), Ui.color(c, R.color.graph_mark),
-                    Ui.color(c, R.color.on_surface_variant));
+                    palette, Ui.color(c, R.color.graph_mark), Ui.color(c, R.color.on_surface_variant));
             gv.setBackground(Ui.rounded(Ui.color(c, R.color.key_digit), Ui.dp(c, 16)));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 240));
+                    ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 280));
             lp.setMargins(0, Ui.dp(c, 10), 0, 0);
             card.addView(gv, lp);
+            TextView hint = Ui.text(c, "Тяните — двигать; щипок — масштаб; двойной тап — сброс вида",
+                    12, R.color.on_surface_variant, false);
+            hint.setPadding(0, Ui.dp(c, 4), 0, 0);
+            card.addView(hint);
         }
 
         if (!res.steps.isEmpty()) {
