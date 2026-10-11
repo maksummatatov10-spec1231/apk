@@ -41,6 +41,7 @@ public final class SolverCli {
             sb.append(",\"heading\":").append(str(r.heading));
             sb.append(",\"answers\":").append(arr(r.answers));
             sb.append(",\"steps\":").append(arr(r.steps));
+            sb.append(",\"notebook\":").append(arr(r.notebook));
             sb.append(",\"graph\":").append(r.graph != null ? "true" : "false");
             sb.append(",\"error\":null");
         } catch (MathError e) {

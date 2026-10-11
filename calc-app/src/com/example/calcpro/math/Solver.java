@@ -22,6 +22,8 @@ public final class Solver {
         public final List<String> answers = new ArrayList<>();
         public Node graph;
         public final List<Double> marks = new ArrayList<>();
+        /** Запись для тетради: только уравнения, неравенства и ответы, без пояснений. */
+        public final List<String> notebook = new ArrayList<>();
     }
 
     private Solver() {}
@@ -99,6 +101,7 @@ public final class Solver {
         Result r = new Result();
         r.heading = "Уравнение";
         r.steps.add("Исходное уравнение: " + left.show() + " = " + right.show());
+        r.notebook.add(left.show() + " = " + right.show());
 
         Set<String> vars = new TreeSet<>();
         left.collectVars(vars);
@@ -127,11 +130,13 @@ public final class Solver {
                 r.steps.add("Переносим всё в левую часть: " + left.show() + " − " + rs + " = 0");
             }
             r.steps.add("Раскрываем скобки и приводим подобные: " + p.format() + " = 0");
+            r.notebook.add(p.format() + " = 0");
             solvePoly(p, r);
         } else if (!solveRadical(left, right, f, r)) {
             solveNumeric(f, r);
         }
         normalizeRoots(r);
+        for (String a : r.answers) r.notebook.add(a);
         r.graph = f;
         return r;
     }
@@ -235,6 +240,7 @@ public final class Solver {
         Rational c = p.coef(0);
         r.steps.add("Квадратное уравнение: a = " + Fmt.rat(a) + ", b = " + Fmt.rat(b) + ", c = " + Fmt.rat(c));
         Rational disc = b.mul(b).sub(Rational.of(4).mul(a).mul(c));
+        r.notebook.add("D = " + Fmt.rat(disc));
         r.steps.add("Дискриминант: D = b² − 4ac = " + Fmt.par(b) + "² − 4·" + Fmt.par(a) + "·" + Fmt.par(c)
                 + " = " + Fmt.rat(disc));
         Rational twoA = Rational.of(2).mul(a);
@@ -453,46 +459,96 @@ public final class Solver {
                     + ": возводим обе части в степень " + n + ".");
         }
         Poly eq = inner.sub(p.pow(n));
+        r.steps.add("Получаем: " + inner.format() + " = " + p.pow(n).format());
         if (eq.degree() == 0) {
             if (eq.isZero()) return false;   // тождество: решения — вся область, отдаём численному методу
             r.steps.add("Получаем неверное равенство " + eq.format() + " = 0: решений нет.");
             r.answers.add("Решений нет");
             return true;
         }
-        r.steps.add("Получаем уравнение: " + eq.format() + " = 0");
+        r.steps.add("Переносим всё в левую часть: " + eq.format() + " = 0");
+        r.notebook.add(eq.format() + " = 0");
 
-        List<double[]> cands = new ArrayList<>();
-        if (eq.degree() == 1) {
-            cands.add(new double[] {eq.coef(0).neg().div(eq.coef(1)).toDouble(), 0});
-        } else {
-            cands.addAll(durandKerner(eq));
+        // ОДЗ: подкоренные выражения (и правая часть одиночного √) неотрицательны
+        List<String> odz = new ArrayList<>();
+        for (Poly d : domain) odz.add(d.format() + " ≥ 0");
+        if (nonneg != null) odz.add(nonneg.format() + " ≥ 0");
+        if (!odz.isEmpty()) {
+            String odzText = String.join(", ", odz);
+            r.steps.add("ОДЗ: " + odzText);
+            r.notebook.add("ОДЗ: " + odzText);
         }
+
+        // Корни: квадратное — по формуле с дискриминантом, иначе численно
+        List<Double> cands = new ArrayList<>();
+        if (eq.degree() == 1) {
+            cands.add(eq.coef(0).neg().div(eq.coef(1)).toDouble());
+        } else if (eq.degree() == 2) {
+            Rational a2 = eq.coef(2), b2 = eq.coef(1), c2 = eq.coef(0);
+            Rational disc = b2.mul(b2).sub(Rational.of(4).mul(a2).mul(c2));
+            r.steps.add("D = b² − 4ac = " + Fmt.rat(disc));
+            r.notebook.add("D = " + Fmt.rat(disc));
+            if (disc.signum() >= 0) {
+                double sd = Math.sqrt(disc.toDouble());
+                double twoA = 2 * a2.toDouble();
+                double x1 = (-b2.toDouble() - sd) / twoA;
+                double x2 = (-b2.toDouble() + sd) / twoA;
+                r.steps.add("x₁ = (−b − √D) / 2a = " + Fmt.num(x1) + ",  x₂ = (−b + √D) / 2a = " + Fmt.num(x2));
+                cands.add(x1);
+                if (Math.abs(x1 - x2) > 1e-12) cands.add(x2);
+            }
+        } else {
+            for (double[] c : durandKerner(eq)) {
+                if (Math.abs(c[1]) <= 1e-7) cands.add(c[0]);
+            }
+        }
+
         List<Double> xs = new ArrayList<>();
-        for (double[] c : cands) {
-            if (Math.abs(c[1]) > 1e-7) continue;          // только действительные корни
-            double x = c[0];
-            // Корень, близкий к целому (например 2 - 1e-16), снапим: иначе подкоренное выражение
-            // становится чуть отрицательным и корень даёт NaN, и верный корень теряется.
+        for (double c : cands) {
+            double x = c;
+            // Корень, близкий к целому (например 2 − 1e-16), снапим: иначе подкоренное выражение
+            // становится чуть отрицательным, и √ даёт NaN, а верный корень теряется.
             double nearest = Math.rint(x);
             if (Math.abs(x - nearest) < 1e-9) x = nearest;
+
+            // проверка каждого корня: ОДЗ и подстановка в исходное уравнение
+            List<String> parts = new ArrayList<>();
+            boolean inDom = true;
+            for (Poly d : domain) {
+                double val = polyAt(d, x);
+                parts.add(d.format() + " = " + Fmt.num(val) + " ≥ 0");
+                if (val < -1e-9) inDom = false;
+            }
+            if (nonneg != null) {
+                double val = polyAt(nonneg, x);
+                parts.add(nonneg.format() + " = " + Fmt.num(val) + " ≥ 0");
+                if (val < -1e-9) inDom = false;
+            }
             Double v = evalAt(f, x);
             boolean valid;
             if (v != null) {
                 valid = Math.abs(v) <= 1e-6;                // подстановка в исходное уравнение
             } else {
-                // NaN от √ из-за погрешности -1e-16: проверяем область определения алгебраически
-                valid = inDomain(domain, x) && (nonneg == null || polyAt(nonneg, x) >= -1e-9);
+                valid = inDom;                              // NaN: только ОДЗ проверяем алгебраически
             }
-            if (!valid) continue;
-            addRoot(xs, x);
+            String label = "x = " + Fmt.num(x);
+            if (valid && inDom) {
+                addRoot(xs, x);
+                r.steps.add("Проверка " + label + ": " + (parts.isEmpty() ? "" : String.join(", ", parts) + " — ОДЗ выполнена, ")
+                        + "корень подходит");
+                if (!parts.isEmpty()) r.notebook.add(label + ": " + String.join(", ", parts));
+            } else {
+                r.steps.add("Проверка " + label + ": " + (parts.isEmpty() ? "" : String.join(", ", parts) + " — ")
+                        + (inDom ? "подстановка в исходное уравнение неверна" : "не входит в ОДЗ")
+                        + ", посторонний корень");
+            }
         }
         if (xs.isEmpty()) {
-            r.steps.add("Подстановка в исходное уравнение отсекла все корни: решений нет.");
+            r.steps.add("Все корни отброшены проверкой: решений нет.");
             r.answers.add("Решений нет");
             return true;
         }
         Collections.sort(xs);
-        r.steps.add("Проверка подстановкой: все найденные корни удовлетворяют исходному уравнению.");
         for (double x : xs) {
             double nearest = Math.rint(x);
             boolean integer = Math.abs(x - nearest) < 1e-6;

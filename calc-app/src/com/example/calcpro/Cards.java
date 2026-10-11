@@ -97,6 +97,34 @@ final class Cards {
                 }
             }
         }
+        if (!res.notebook.isEmpty()) {
+            TextView title = Ui.text(c, "Запись для тетради", 14, R.color.on_surface, true);
+            title.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 6));
+            card.addView(title);
+            LinearLayout box = new LinearLayout(c);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setPadding(Ui.dp(c, 14), Ui.dp(c, 10), Ui.dp(c, 14), Ui.dp(c, 10));
+            box.setBackground(Ui.rounded(Ui.color(c, R.color.key_digit), Ui.dp(c, 14)));
+            StringBuilder all = new StringBuilder();
+            for (String line : res.notebook) {
+                if (all.length() > 0) all.append('\n');
+                all.append(line);
+                TextView t = Ui.text(c, line, 17, R.color.on_surface, false);
+                t.setTypeface(Typeface.MONOSPACE);
+                t.setTextIsSelectable(true);
+                t.setPadding(0, Ui.dp(c, 3), 0, Ui.dp(c, 3));
+                box.addView(t);
+            }
+            card.addView(box);
+            TextView copyAll = Ui.text(c, "Копировать запись", 14, R.color.accent, true);
+            copyAll.setPadding(0, Ui.dp(c, 8), 0, 0);
+            copyAll.setClickable(true);
+            final String text = all.toString();
+            copyAll.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { copy(v.getContext(), text); }
+            });
+            card.addView(copyAll);
+        }
         container.addView(card, index, cardParams(c));
         Ui.appear(card, 0);
     }
