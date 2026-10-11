@@ -67,7 +67,8 @@ public final class Table {
     private float serveDelay;     // пауза после гола, с
     private int serveTo = -1;     // кому подаём: сторона, которая пропустила
     private final float[] aiReact = new float[2];   // таймер реакции ботов
-    private final float[] aiAimX = new float[2];    // цель ботов по x (с ошибкой)
+    private final float[] aiAimX = new float[2];
+    private final float[] strikeT = new float[2];   // таймер удара бота, с    // цель ботов по x (с ошибкой)
     private long seed = 12345L;
 
     public Table(Listener l) {
@@ -90,6 +91,7 @@ public final class Table {
         puckX = W / 2; puckY = H / 2; puckVX = puckVY = 0;
         aiReact[0] = aiReact[1] = 0;
         aiAimX[0] = aiAimX[1] = W / 2;
+        strikeT[0] = strikeT[1] = 0;
     }
 
     public boolean isOver() {
@@ -342,21 +344,30 @@ public final class Table {
             aiReact[s] = level.reaction;
             aiAimX[s] = predictX(mPuckY, mVY) + (level.error > 0 ? (rnd() * 2 - 1) * level.error : 0);
         }
-        float goalX = W / 2, goalY = H;     // бьём в ворота соперника (в зеркальных координатах — нижние)
         float tgtX, tgtY;
-        if (mPuckY < H / 2 || (mVY < 0 && mPuckY < H * 0.55f)) {
-            // шайба на стороне бота — атакуем: зайти сзади и ударить в сторону ворот
-            float dirX = goalX - puckX, dirY = goalY - mPuckY;
+        // атака только когда шайба заметно на стороне бота: точка «за шайбой» должна быть досягаемой
+        if (mPuckY < H / 2 - PADDLE_R || (mVY < 0 && mPuckY < H * 0.55f - PADDLE_R)) {
+            // атака: подход сзади шайбы (вне контакта), затем короткий удар насквозь к воротам соперника
+            float dirX = W / 2 - puckX, dirY = H - mPuckY;
             float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
             if (len < 1e-3f) len = 1;
-            tgtX = puckX - dirX / len * (PUCK_R + PADDLE_R) * 0.9f;
-            tgtY = mPuckY - dirY / len * (PUCK_R + PADDLE_R) * 0.9f;
-            if (tgtY < PADDLE_R) tgtY = PADDLE_R;
-            if (mPuckY < 500 && mVY > -80) {
-                // шайба почти у бота и медленная: бьём сразу
-                tgtX = aiAimX[s];
-                tgtY = mPuckY - (PUCK_R + PADDLE_R) * 0.6f;   // заход сзади: ракетка выше шайбы (к своим воротам), бьёт к воротам соперника
+            float ux = dirX / len, uy = dirY / len;
+            float min = PUCK_R + PADDLE_R;
+            float behindX = puckX - ux * min * 1.15f, behindY = mPuckY - uy * min * 1.15f;
+            float myX = px[s], myY = low ? H - py[s] : py[s];   // ракетка в зеркальных координатах
+            if (strikeT[s] > 0) {
+                strikeT[s] -= dt;
+                tgtX = puckX + ux * min * 0.5f;
+                tgtY = mPuckY + uy * min * 0.5f;
+            } else if (Math.hypot(myX - behindX, myY - behindY) < 45f && mPuckY < H / 2 + 200) {
+                strikeT[s] = 0.3f;                    // стоим сзади — бьём
+                tgtX = puckX + ux * min * 0.5f;
+                tgtY = mPuckY + uy * min * 0.5f;
+            } else {
+                tgtX = behindX;
+                tgtY = behindY;
             }
+            if (tgtY < PADDLE_R) tgtY = PADDLE_R;
         } else {
             // оборона: стоим между шайбой и своими воротами
             tgtX = clamp(aiAimX[s] * 0.5f + W / 2 * 0.5f, W / 2 - 260, W / 2 + 260);

@@ -18,6 +18,19 @@ final class Settings {
     int matches() { return prefs.getInt("matches", 0); }
     boolean has(String ach) { return prefs.getBoolean("ach_" + ach, false); }
 
+    /** Монеты: начисляются за голы и победы против ИИ, тратятся в магазине. */
+    int coins() { return prefs.getInt("coins", 0); }
+    void addCoins(int n) { prefs.edit().putInt("coins", coins() + n).apply(); }
+    boolean spend(int n) {
+        if (coins() < n) return false;
+        prefs.edit().putInt("coins", coins() - n).apply();
+        return true;
+    }
+    boolean owned(String id) { return prefs.getBoolean("own_" + id, false); }
+    void setOwned(String id) { prefs.edit().putBoolean("own_" + id, true).apply(); }
+    String equipped(String cat) { return prefs.getString("eq_" + cat, cat.equals("paddle") ? "p_red" : "k_black"); }
+    void equip(String cat, String id) { prefs.edit().putString("eq_" + cat, id).apply(); }
+
     /** Записывает итог матча и возвращает список новых достижений. */
     String recordMatch(int playerSide, int[] score, int lowLevel, int highLevel, boolean vsAi) {
         SharedPreferences.Editor e = prefs.edit();

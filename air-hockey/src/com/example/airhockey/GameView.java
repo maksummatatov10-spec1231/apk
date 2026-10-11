@@ -22,7 +22,7 @@ import java.util.List;
 public final class GameView extends View implements Table.Listener {
     static final float LW = 1080f, LH = 1930f, TX = 40f, TY = 130f;
 
-    enum Screen { MENU, DIFF, PLAYING, PAUSED, OVER }
+    enum Screen { MENU, DIFF, SHOP, PLAYING, PAUSED, OVER }
     enum Mode { AI, TWO, BOTS }
 
     private static final String[] LEVEL_NAMES = {"Лёгкий", "Средний", "Сложный", "Мастер"};
@@ -158,6 +158,7 @@ public final class GameView extends View implements Table.Listener {
             newAchievements = settings.recordMatch(0, table.score, levelBottom, levelTop, mode == Mode.AI);
         }
         boolean playerWon = mode == Mode.AI && table.winner() == 0;
+        if (mode == Mode.AI) settings.addCoins(table.score[0] + (playerWon ? 10 : 0));
         audio.play(mode == Mode.BOTS || mode == Mode.TWO || playerWon ? Audio.WIN : Audio.LOSE);
         buildButtons();
     }
@@ -227,6 +228,7 @@ public final class GameView extends View implements Table.Listener {
                 add(cx, 520, bw, bh, "Против ИИ", "mode_ai", false);
                 add(cx, 680, bw, bh, "2 игрока", "mode_two", false);
                 add(cx, 840, bw, bh, "Бот против бота", "mode_bots", false);
+                add(cx, 1000, bw, 100, "Магазин", "shop", false);
                 add(cx, 1400, bw, 100, "Звук: " + (settings.sound() ? "вкл" : "выкл"), "sound", false);
                 break;
             case DIFF: {
@@ -243,6 +245,22 @@ public final class GameView extends View implements Table.Listener {
                 }
                 add(cx, 1100, bw, bh, "Старт", "start", false);
                 add(cx, 1260, bw, 100, "Назад", "back", false);
+                break;
+            }
+            case SHOP: {
+                // ракетки — с 420, шайбы — с 1000; по два в ряд
+                int[] idx = {0, 0};
+                for (Shop.Item it : Shop.ITEMS) {
+                    int ci = it.category.equals("paddle") ? 0 : 1;
+                    int col = idx[ci] % 2, row = idx[ci] / 2;
+                    idx[ci]++;
+                    float x = 40 + col * 520, y = (ci == 0 ? 420 : 1000) + row * 150;
+                    boolean owned = it.price == 0 || settings.owned(it.id);
+                    boolean equipped = settings.equipped(it.category).equals(it.id);
+                    String status = equipped ? "надето" : owned ? "выбрать" : it.price + " монет";
+                    add(x, y, 500, 120, it.name + " · " + status, (owned ? "equip_" : "buy_") + it.id, equipped);
+                }
+                add(cx, 1700, bw, 110, "Назад", "back", false);
                 break;
             }
             case PLAYING:
@@ -276,6 +294,17 @@ public final class GameView extends View implements Table.Listener {
         else if (a.startsWith("hi_")) { levelTop = a.charAt(3) - '0'; buildButtons(); }
         else if (a.equals("start")) startMatch();
         else if (a.equals("back")) { screen = Screen.MENU; buildButtons(); }
+        else if (a.equals("shop")) { screen = Screen.SHOP; buildButtons(); }
+        else if (a.startsWith("buy_")) {
+            Shop.Item it = Shop.find(a.substring(4));
+            if (settings.spend(it.price)) { settings.setOwned(it.id); settings.equip(it.category, it.id); }
+            buildButtons();
+        }
+        else if (a.startsWith("equip_")) {
+            Shop.Item it = Shop.find(a.substring(6));
+            settings.equip(it.category, it.id);
+            buildButtons();
+        }
         else if (a.equals("pause")) { screen = Screen.PAUSED; buildButtons(); }
         else if (a.equals("resume")) { screen = Screen.PLAYING; lastNs = System.nanoTime(); buildButtons(); }
         else if (a.equals("restart")) startMatch();
@@ -345,6 +374,7 @@ public final class GameView extends View implements Table.Listener {
 
         if (screen == Screen.MENU) drawMenu(c);
         else if (screen == Screen.DIFF) drawDiff(c);
+        else if (screen == Screen.SHOP) drawShop(c);
         else {
             drawTable(c);
             drawHud(c);
@@ -358,11 +388,11 @@ public final class GameView extends View implements Table.Listener {
     private void drawMenu(Canvas c) {
         text(c, "AIR HOCKEY", LW / 2, 230, 110, C_TEXT, true, Paint.Align.CENTER);
         text(c, "Challenge", LW / 2, 310, 56, C_CYAN, false, Paint.Align.CENTER);
-        text(c, "Матчей: " + settings.matches() + "   Побед: " + settings.wins(), LW / 2, 1290, 48, C_DIM, false, Paint.Align.CENTER);
-        text(c, "Достижения", LW / 2, 960, 46, C_TEXT, true, Paint.Align.CENTER);
-        drawAch(c, 1000, "first_win", "Первая победа");
-        drawAch(c, 1060, "master", "Победа над Мастером");
-        drawAch(c, 1120, "shutout", "Сухая победа 7:0");
+        text(c, "Матчей: " + settings.matches() + "   Побед: " + settings.wins() + "   Монеты: " + settings.coins(), LW / 2, 1290, 48, C_DIM, false, Paint.Align.CENTER);
+        text(c, "Достижения", LW / 2, 1100, 46, C_TEXT, true, Paint.Align.CENTER);
+        drawAch(c, 1160, "first_win", "Первая победа");
+        drawAch(c, 1220, "master", "Победа над Мастером");
+        drawAch(c, 1280, "shutout", "Сухая победа 7:0");
     }
 
     private void drawAch(Canvas c, float y, String id, String name) {
@@ -381,6 +411,17 @@ public final class GameView extends View implements Table.Listener {
         }
         text(c, "Лёгкий — медленный, ошибается  ·  Мастер — почти безошибочный", LW / 2, 900, 30, C_DIM, false, Paint.Align.CENTER);
     }
+
+    private void drawShop(Canvas c) {
+        text(c, "Магазин", LW / 2, 200, 96, C_TEXT, true, Paint.Align.CENTER);
+        text(c, "Монеты: " + settings.coins(), LW / 2, 280, 56, C_GOLD, true, Paint.Align.CENTER);
+        text(c, "Цвет ракетки", LW / 2, 380, 44, C_CYAN, false, Paint.Align.CENTER);
+        text(c, "Цвет шайбы", LW / 2, 980, 44, C_CYAN, false, Paint.Align.CENTER);
+        text(c, "Монеты: 1 за свой гол и 10 за победу над ИИ", LW / 2, 1880, 30, C_DIM, false, Paint.Align.CENTER);
+    }
+
+    private int paddleColor() { return Shop.find(settings.equipped("paddle")).color; }
+    private int puckColor() { return Shop.find(settings.equipped("puck")).color; }
 
     private void drawTable(Canvas c) {
         c.save();
@@ -423,7 +464,7 @@ public final class GameView extends View implements Table.Listener {
         paint.setAlpha(255);
         // ракетки
         for (int s = 0; s < 2; s++) {
-            int col = s == 0 ? C_RED : C_CYAN;
+            int col = s == 0 ? paddleColor() : C_CYAN;
             float x = table.px[s] + shakeX(), y = table.py[s] + shakeY();
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(0x55000000);
@@ -443,7 +484,7 @@ public final class GameView extends View implements Table.Listener {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0x55000000);
         c.drawCircle(px + 6, py + 8, Table.PUCK_R, paint);
-        paint.setColor(0xFF111111);
+        paint.setColor(puckColor());
         c.drawCircle(px, py, Table.PUCK_R, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(7);
