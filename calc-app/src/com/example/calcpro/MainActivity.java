@@ -24,15 +24,19 @@ import com.example.calcpro.math.Solver;
 
 import java.util.List;
 
+/**
+ * Оболочка приложения: верхняя панель и выезжающее слева меню.
+ * Экраны: обычный и научный калькулятор (как Calculator²), решатель уравнений,
+ * история и справка «О приложении».
+ */
 public class MainActivity extends Activity {
 
-    static final int SCREEN_CALC = 0;
-    static final int SCREEN_EQUATIONS = 1;
-    /** Страницы примеров идут подряд, начиная с этого индекса. */
-    static final int FIRST_PAGE = 2;
-    static final int SCREEN_HISTORY = FIRST_PAGE + Catalog.EXAMPLE_PAGES.length;
-    static final int SCREEN_HELP = SCREEN_HISTORY + 1;
-    static final int SCREEN_COUNT = SCREEN_HELP + 1;
+    static final int SCREEN_BASIC = 0;
+    static final int SCREEN_SCIENTIFIC = 1;
+    static final int SCREEN_EQUATIONS = 2;
+    static final int SCREEN_HISTORY = 3;
+    static final int SCREEN_ABOUT = 4;
+    static final int SCREEN_COUNT = 5;
 
     private static final int PANEL_HEIGHT_DP = 420;
 
@@ -46,13 +50,17 @@ public class MainActivity extends Activity {
     private final TextView[] navLabels = new TextView[SCREEN_COUNT];
     private int current = -1;
 
+    // экран «Уравнения»
     private EditText input;
     private LinearLayout results;
+    private TextView resultsHint;
     private ScrollView resultScroll;
     private LinearLayout keypadBox;
     private ImageView keypadToggle;
     private boolean keypadOpen;
     private String lastAnswer;   // последний числовой ответ для кнопки «Ans»
+
+    // экран «История»
     private LinearLayout historyList;
     private TextView historyEmpty;
 
@@ -68,13 +76,11 @@ public class MainActivity extends Activity {
         screenHost = new FrameLayout(this);
         root.addView(screenHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        screens[SCREEN_CALC] = buildCalcScreen();
-        screens[SCREEN_EQUATIONS] = buildCatalogScreen(Catalog.EQUATIONS);
-        for (int i = 0; i < Catalog.EXAMPLE_PAGES.length; i++) {
-            screens[FIRST_PAGE + i] = buildExamplePage(Catalog.EXAMPLE_PAGES[i]);
-        }
+        screens[SCREEN_BASIC] = new CalcPanel(this, false, panelListener());
+        screens[SCREEN_SCIENTIFIC] = new CalcPanel(this, true, panelListener());
+        screens[SCREEN_EQUATIONS] = buildEquationsScreen();
         screens[SCREEN_HISTORY] = buildHistoryScreen();
-        screens[SCREEN_HELP] = buildHelpScreen();
+        screens[SCREEN_ABOUT] = buildAboutScreen();
         for (View s : screens) {
             s.setVisibility(View.GONE);
             screenHost.addView(s, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -88,8 +94,7 @@ public class MainActivity extends Activity {
         });
         setContentView(drawer);
 
-        showScreen(SCREEN_CALC);
-        if (results.getChildCount() == 0) addWelcome();
+        showScreen(SCREEN_BASIC);
     }
 
     @Override
@@ -98,29 +103,38 @@ public class MainActivity extends Activity {
             drawer.close();
         } else if (keypadOpen) {
             setKeypadOpen(false);
-        } else if (current != SCREEN_CALC) {
-            showScreen(SCREEN_CALC);
+        } else if (current != SCREEN_BASIC) {
+            showScreen(SCREEN_BASIC);
         } else {
             super.onBackPressed();
         }
     }
 
+    /** Калькулятор отдаёт уравнения и графики в раздел «Уравнения» и решает их там. */
+    private CalcPanel.Listener panelListener() {
+        return new CalcPanel.Listener() {
+            @Override public void onEquation(String text) {
+                openQuery(text, true);
+            }
+        };
+    }
+
     // ---------- оболочка: верхняя панель и левое меню ----------
 
     private String titleOf(int id) {
-        if (id == SCREEN_CALC) return getString(R.string.menu_calc);
+        if (id == SCREEN_BASIC) return getString(R.string.menu_basic);
+        if (id == SCREEN_SCIENTIFIC) return getString(R.string.menu_scientific);
         if (id == SCREEN_EQUATIONS) return getString(R.string.menu_equations);
         if (id == SCREEN_HISTORY) return getString(R.string.menu_history);
-        if (id == SCREEN_HELP) return getString(R.string.menu_help);
-        return Catalog.EXAMPLE_PAGES[id - FIRST_PAGE].title;
+        return getString(R.string.menu_about);
     }
 
     private int iconOf(int id) {
-        if (id == SCREEN_CALC) return R.drawable.ic_calc;
+        if (id == SCREEN_BASIC) return R.drawable.ic_calc;
+        if (id == SCREEN_SCIENTIFIC) return R.drawable.ic_science;
         if (id == SCREEN_EQUATIONS) return R.drawable.ic_equation;
         if (id == SCREEN_HISTORY) return R.drawable.ic_history;
-        if (id == SCREEN_HELP) return R.drawable.ic_help;
-        return R.drawable.ic_examples;
+        return R.drawable.ic_help;
     }
 
     private View buildAppBar() {
@@ -132,7 +146,7 @@ public class MainActivity extends Activity {
         FrameLayout menuButton = new FrameLayout(this);
         menuButton.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 24), 0x22000000));
         menuButton.setClickable(true);
-        menuButton.setContentDescription(getString(R.string.menu_calc));
+        menuButton.setContentDescription(getString(R.string.menu_basic));
         hamburger = new HamburgerView(this);
         hamburger.setColor(Ui.color(this, R.color.on_surface));
         menuButton.addView(hamburger, new FrameLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24), Gravity.CENTER));
@@ -144,7 +158,7 @@ public class MainActivity extends Activity {
         });
         bar.addView(menuButton, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
 
-        title = Ui.text(this, getString(R.string.menu_calc), 22, R.color.on_surface, true);
+        title = Ui.text(this, getString(R.string.menu_basic), 22, R.color.on_surface, true);
         title.setPadding(Ui.dp(this, 8), 0, 0, 0);
         bar.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         return bar;
@@ -160,16 +174,16 @@ public class MainActivity extends Activity {
         sub.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 16));
         col.addView(sub);
 
-        col.addView(navGroup("Решение"));
-        col.addView(navItem(SCREEN_CALC));
-        col.addView(navItem(SCREEN_EQUATIONS));
+        col.addView(navGroup("Калькулятор"));
+        col.addView(navItem(SCREEN_BASIC));
+        col.addView(navItem(SCREEN_SCIENTIFIC));
 
-        col.addView(navGroup("Примеры"));
-        for (int i = 0; i < Catalog.EXAMPLE_PAGES.length; i++) col.addView(navItem(FIRST_PAGE + i));
+        col.addView(navGroup("Решатель"));
+        col.addView(navItem(SCREEN_EQUATIONS));
 
         col.addView(navGroup("Прочее"));
         col.addView(navItem(SCREEN_HISTORY));
-        col.addView(navItem(SCREEN_HELP));
+        col.addView(navItem(SCREEN_ABOUT));
 
         ScrollView sv = new ScrollView(this);
         sv.setVerticalScrollBarEnabled(false);
@@ -269,14 +283,14 @@ public class MainActivity extends Activity {
         }
 
         if (id == SCREEN_HISTORY) refreshHistory();
-        if (id != SCREEN_CALC) setKeypadOpen(false);
+        if (id != SCREEN_EQUATIONS) setKeypadOpen(false);
         updateNav();
         drawer.close();
     }
 
-    // ---------- экран «Калькулятор» ----------
+    // ---------- экран «Уравнения» ----------
 
-    private View buildCalcScreen() {
+    private View buildEquationsScreen() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
 
@@ -378,6 +392,7 @@ public class MainActivity extends Activity {
         results.setPadding(rp, Ui.dp(this, 8), rp, Ui.dp(this, 12));
         resultScroll.addView(results, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         col.addView(resultScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        showHint();
 
         // Панель: ручка для сворачивания + клавиатура. По умолчанию скрыта.
         keypadBox = new LinearLayout(this);
@@ -531,27 +546,26 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showHint() {
+        results.removeAllViews();
+        resultsHint = Ui.text(this, getString(R.string.equations_hint), 15, R.color.on_surface_variant, false);
+        resultsHint.setGravity(Gravity.CENTER);
+        resultsHint.setPadding(Ui.dp(this, 24), Ui.dp(this, 64), Ui.dp(this, 24), 0);
+        results.addView(resultsHint, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
     private void clearResults() {
         results.animate().alpha(0f).setDuration(140).withEndAction(new Runnable() {
             @Override public void run() {
-                results.removeAllViews();
-                addWelcome();
+                showHint();
                 results.setAlpha(1f);
             }
         }).start();
     }
 
-    private void addWelcome() {
-        Cards.addWelcome(this, results, new Cards.Picker() {
-            @Override public void pick(String query) { openQuery(query, true); }
-        }, new Runnable() {
-            @Override public void run() { showScreen(SCREEN_EQUATIONS); }
-        });
-    }
-
-    /** Открывает калькулятор с готовым запросом (из меню, истории или примеров). */
+    /** Открывает решатель с готовым запросом (из калькулятора, истории). */
     private void openQuery(String query, boolean solveNow) {
-        showScreen(SCREEN_CALC);
+        showScreen(SCREEN_EQUATIONS);
         input.setText(query);
         input.setSelection(query.length());
         if (solveNow) solve();
@@ -565,6 +579,7 @@ public class MainActivity extends Activity {
             return;
         }
         HistoryStore.add(this, q);
+        if (resultsHint != null && results.indexOfChild(resultsHint) >= 0) results.removeView(resultsHint);
         try {
             Solver.Result res = Solver.solve(q);
             rememberAnswer(res);
@@ -577,54 +592,6 @@ public class MainActivity extends Activity {
         resultScroll.post(new Runnable() {
             @Override public void run() { resultScroll.smoothScrollTo(0, 0); }
         });
-    }
-
-    // ---------- экран «Уравнения» ----------
-
-    private View buildCatalogScreen(Catalog.Section[] sections) {
-        ScrollView sv = new ScrollView(this);
-        sv.setVerticalScrollBarEnabled(false);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int p = Ui.dp(this, 16);
-        col.setPadding(p, 0, p, Ui.dp(this, 28));
-        for (Catalog.Section section : sections) {
-            col.addView(Cards.sectionTitle(this, section.title));
-            for (final Catalog.Item item : section.items) {
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.setMargins(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
-                col.addView(Cards.row(this, item.expr, item.note, new View.OnClickListener() {
-                    @Override public void onClick(View v) { openQuery(item.expr, true); }
-                }), lp);
-            }
-        }
-        sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return sv;
-    }
-
-    // ---------- страница одной категории примеров ----------
-
-    private View buildExamplePage(Catalog.Page page) {
-        ScrollView sv = new ScrollView(this);
-        sv.setVerticalScrollBarEnabled(false);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int p = Ui.dp(this, 16);
-        col.setPadding(p, 0, p, Ui.dp(this, 28));
-
-        TextView sub = Ui.text(this, page.subtitle, 14, R.color.on_surface_variant, false);
-        sub.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 10));
-        col.addView(sub);
-
-        for (final Catalog.Item item : page.items) {
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
-            col.addView(Cards.row(this, item.expr, item.note, new View.OnClickListener() {
-                @Override public void onClick(View v) { openQuery(item.expr, true); }
-            }), lp);
-        }
-        sv.addView(col, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return sv;
     }
 
     // ---------- экран «История» ----------
@@ -680,9 +647,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---------- экран «Справка» ----------
+    // ---------- экран «О приложении» ----------
 
-    private View buildHelpScreen() {
+    private View buildAboutScreen() {
         ScrollView sv = new ScrollView(this);
         sv.setVerticalScrollBarEnabled(false);
         TextView t = Ui.text(this, getString(R.string.help_text), 15, R.color.on_surface, false);

@@ -9,6 +9,5 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 "$T/bin/javac" -encoding UTF-8 -source 8 -target 8 -Xlint:-options -nowarn \
   -bootclasspath "$T/platforms/android-31/android.jar" -d "$OUT" \
   "$HERE"/src/com/example/calcpro/math/*.java \
-  "$HERE"/src/com/example/calcpro/Catalog.java \
   "$HERE"/test/com/example/calcpro/SolverCli.java
 echo "CLI собран: $OUT"

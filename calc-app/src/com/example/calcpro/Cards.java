@@ -14,13 +14,9 @@ import android.widget.Toast;
 
 import com.example.calcpro.math.Solver;
 
-/** Построение карточек: результаты, ошибки, приветствие, строки списков. */
+/** Построение карточек: результаты, ошибки, строки списков. */
 final class Cards {
     private Cards() {}
-
-    interface Picker {
-        void pick(String query);
-    }
 
     static LinearLayout card(Context c) {
         LinearLayout card = new LinearLayout(c);
@@ -162,45 +158,6 @@ final class Cards {
         m.setPadding(0, Ui.dp(c, 8), 0, 0);
         card.addView(m);
         container.addView(card, index, cardParams(c));
-        Ui.appear(card, 0);
-    }
-
-    /** Приветствие: короткое описание и быстрые примеры. */
-    static void addWelcome(final Context c, LinearLayout container, final Picker picker, final Runnable openEquations) {
-        LinearLayout card = card(c);
-        TextView head = Ui.text(c, "ЧТО МОЖНО СДЕЛАТЬ", 12, R.color.accent, true);
-        head.setLetterSpacing(0.08f);
-        card.addView(head);
-
-        TextView t = Ui.text(c, c.getString(R.string.welcome_text), 15, R.color.on_surface, false);
-        t.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 10));
-        t.setLineSpacing(Ui.dp(c, 2), 1f);
-        card.addView(t);
-
-        String[] examples = {"2x² − 3x + 1 = 0", "x³ − 6x² + 11x − 6 = 0", "(2 + 3) · 4 ÷ 5 − 2^3", "sin(x) = 0,5"};
-        for (final String ex : examples) {
-            TextView e = Ui.text(c, ex, 15, R.color.accent, true);
-            e.setTypeface(Typeface.MONOSPACE);
-            e.setBackground(Ui.ripple(Ui.color(c, R.color.key_digit), Ui.dp(c, 14), 0x22000000));
-            e.setPadding(Ui.dp(c, 14), Ui.dp(c, 11), Ui.dp(c, 14), Ui.dp(c, 11));
-            e.setClickable(true);
-            e.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { picker.pick(ex); }
-            });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, Ui.dp(c, 4), 0, Ui.dp(c, 4));
-            card.addView(e, lp);
-        }
-
-        TextView more = Ui.text(c, c.getString(R.string.welcome_more), 14, R.color.accent, true);
-        more.setPadding(0, Ui.dp(c, 10), 0, 0);
-        more.setClickable(true);
-        more.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { openEquations.run(); }
-        });
-        card.addView(more);
-        container.addView(card, 0, cardParams(c));
         Ui.appear(card, 0);
     }
 

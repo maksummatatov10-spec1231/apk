@@ -77,7 +77,6 @@
   </main>
   <aside>
     <h2>Примеры из приложения</h2>
-    <div id="catalog"></div>
   </aside>
 </div>
 <div class="toast" id="toast"></div>
@@ -168,25 +167,7 @@ document.getElementById("solve").onclick = solve;
 document.getElementById("clear").onclick = () => { document.getElementById("results").innerHTML = ""; };
 q.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") solve(); });
 
-async function loadCatalog() {
-  const items = await (await fetch("/api/catalog")).json();
-  const box = document.getElementById("catalog");
-  let section = null, group = null;
-  items.forEach(it => {
-    const key = it.group + "/" + it.section;
-    if (key !== section) {
-      section = key;
-      if (it.group !== group) { group = it.group; box.appendChild(el("h2", "", it.group === "equations" ? "Уравнения" : "Примеры")); }
-      box.appendChild(el("div", "sub", it.section));
-    }
-    const b = el("button", "ex");
-    b.appendChild(el("b", "", it.expr));
-    b.appendChild(el("small", "", it.note));
-    b.onclick = () => { q.value = it.expr; solve(); };
-    box.appendChild(b);
-  });
-}
-loadCatalog();
+
 </script>
 </body>
 </html>

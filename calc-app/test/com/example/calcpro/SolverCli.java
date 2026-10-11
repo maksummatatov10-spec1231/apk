@@ -14,17 +14,12 @@ import java.util.List;
  * Консольная обёртка над тем же решателем, что и приложение (без Android).
  * Читает запросы построчно из stdin, на каждый запрос печатает одну строку JSON:
  * {"query","heading","answers","steps","graph","error"}.
- * Режим --catalog печатает примеры из приложения (раздел «Уравнения» и «Примеры»).
  */
 public final class SolverCli {
     private SolverCli() {}
 
     public static void main(String[] args) throws Exception {
         PrintStream out = new PrintStream(new FileOutputStream(FileDescriptor.out), true, "UTF-8");
-        if (args.length > 0 && "--catalog".equals(args[0])) {
-            out.println(catalogJson());
-            return;
-        }
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
         String line;
         while ((line = in.readLine()) != null) {
@@ -52,30 +47,6 @@ public final class SolverCli {
             sb.append(",\"error\":").append(str("Не удалось решить: проверьте запись (" + e + ")"));
         }
         return sb.append('}').toString();
-    }
-
-    static String catalogJson() {
-        StringBuilder sb = new StringBuilder("[");
-        boolean firstGroup = true;
-        for (Catalog.Section s : Catalog.EQUATIONS) {
-            for (Catalog.Item it : s.items) {
-                if (!firstGroup) sb.append(',');
-                firstGroup = false;
-                sb.append("{\"group\":\"equations\",\"section\":").append(str(s.title))
-                  .append(",\"expr\":").append(str(it.expr))
-                  .append(",\"note\":").append(str(it.note)).append('}');
-            }
-        }
-        for (Catalog.Page p : Catalog.EXAMPLE_PAGES) {
-            for (Catalog.Item it : p.items) {
-                if (!firstGroup) sb.append(',');
-                firstGroup = false;
-                sb.append("{\"group\":\"examples\",\"section\":").append(str(p.title))
-                  .append(",\"expr\":").append(str(it.expr))
-                  .append(",\"note\":").append(str(it.note)).append('}');
-            }
-        }
-        return sb.append(']').toString();
     }
 
     private static String arr(List<String> items) {

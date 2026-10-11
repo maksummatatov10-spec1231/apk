@@ -4,7 +4,6 @@
 Запуск (из calc-app/):  scripts/build-cli.sh && python3 lab/server.py [порт]
 Сервер держит одну JVM с SolverCli (тот же код решателя, что в APK) и отдаёт:
   GET  /                — страница с полем ввода и решениями
-  GET  /api/catalog     — примеры из приложения (раздел «Уравнения» и «Примеры»)
   POST /api/solve       — {"query": "..."} -> {"heading", "answers", "steps", "error", ...}
 """
 import json
@@ -50,11 +49,6 @@ class Solver:
             return {"error": "Решатель не ответил"}
         return json.loads(reply)
 
-    def catalog(self) -> list:
-        out = subprocess.run([JAVA, "-Dfile.encoding=UTF-8", "-cp", str(CLASSES),
-                              "com.example.calcpro.SolverCli", "--catalog"],
-                             capture_output=True, text=True, encoding="utf-8", check=True)
-        return json.loads(out.stdout)
 
 
 SOLVER = Solver()
@@ -73,8 +67,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             self._send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
-        elif self.path == "/api/catalog":
-            self._send(200, json.dumps(SOLVER.catalog(), ensure_ascii=False))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
