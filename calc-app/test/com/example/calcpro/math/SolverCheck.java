@@ -53,7 +53,11 @@ public final class SolverCheck {
         expectValue("2,5 × 4", "Ответ: 10");
         expectAnswer("sin(pi/2)", "Ответ: 1");
         expectAnswer("sqrt(16) + 1", "Ответ: 5");
-        expectAnswer("√(2)", "Ответ: 1,41421");
+        expectAnswer("√(2)", "Ответ: √2 ≈ 1,414214");
+        expectAnswer("корень из 50", "Ответ: 5√2 ≈ 7,071068");
+        expectAnswer("√50", "≈ 7,07 (до сотых)");
+        expectAnswer("квадратный корень из 72", "Ответ: 6√2");
+        expectAnswer("корень из 12", "Ответ: 2√3");
         expectValue("2π", "Ответ: " + Fmt.num(2 * Math.PI));
         expectError("1 ÷ 0");
         expectError("sqrt(-4)");

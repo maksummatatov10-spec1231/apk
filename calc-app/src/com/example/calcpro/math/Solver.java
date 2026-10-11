@@ -29,8 +29,10 @@ public final class Solver {
     private Solver() {}
 
     public static Result solve(String raw) {
-        String s = raw == null ? "" : raw.trim();
+        String s = raw == null ? "" : normalizeRoots(raw.trim());
         if (s.isEmpty()) throw new MathError("Введите выражение или уравнение");
+        Result root = solveSquareRoot(s);
+        if (root != null) return root;
         List<String> parts = new ArrayList<>();
         for (String p : s.split("[;\\n]+")) {
             if (!p.trim().isEmpty()) parts.add(p.trim());
@@ -42,6 +44,71 @@ public final class Solver {
             return solveEquation(s);
         }
         return solveExpression(s);
+    }
+
+    /** «корень из 50», «квадратный корень 50» → «√50». */
+    private static final Pattern ROOT_WORD = Pattern.compile(
+            "(?:квадратн[а-яё]*\\s+)?корень\\s*(?:из\\s*)?(?=[0-9(])", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    static String normalizeRoots(String s) {
+        return ROOT_WORD.matcher(s).replaceAll("√");
+    }
+
+    /** Простой корень из натурального числа: √50, √(50). */
+    private static final Pattern PLAIN_SQRT = Pattern.compile("√\\s*\\(?\\s*([0-9]+)\\s*\\)?");
+
+    /**
+     * √n для n, не являющегося полным квадратом: точный вид k√m (m без квадратных множителей)
+     * и десятичные приближения. Для полного квадрата возвращает null — решает общий путь.
+     */
+    private static Result solveSquareRoot(String s) {
+        Matcher m = PLAIN_SQRT.matcher(s);
+        if (!m.matches()) return null;
+        long n;
+        try {
+            n = Long.parseLong(m.group(1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (n < 2 || n > 1_000_000_000_000L) return null;
+        long root = Math.round(Math.sqrt((double) n));
+        if (root * root == n) return null;
+
+        long k = 1, rest = n;
+        for (long d = 2; d * d <= rest; d++) {
+            while (rest % (d * d) == 0) {
+                rest /= d * d;
+                k *= d;
+            }
+        }
+        long sq = k * k;
+        String exact = k == 1 ? "√" + rest : k + "√" + rest;
+        double value = Math.sqrt((double) n);
+
+        Result r = new Result();
+        r.heading = "Корень из " + n;
+        r.steps.add("√" + n);
+        if (k > 1) {
+            r.steps.add("= √" + sq + " · √" + rest);
+            r.steps.add("= " + exact);
+        } else {
+            r.steps.add(exact + " — уже в простейшем виде");
+        }
+        r.answers.add("Ответ: " + exact + " ≈ " + decimal(value, 6));
+        r.answers.add("≈ " + decimal(value, 2) + " (до сотых)");
+        r.answers.add("≈ " + decimal(value, 3) + " (до тысячных)");
+        r.answers.add("≈ " + decimal(value, 4) + " (до десятитысячных)");
+        // Запись для тетради: только формулы.
+        if (k > 1) {
+            r.notebook.add("√" + n + " = √" + sq + " · √" + rest + " = " + exact);
+        }
+        r.notebook.add("√" + n + " ≈ " + decimal(value, 4));
+        return r;
+    }
+
+    private static String decimal(double x, int digits) {
+        return new java.math.BigDecimal(x).setScale(digits, java.math.RoundingMode.HALF_UP)
+                .toPlainString().replace('.', ',');
     }
 
     /** Запись графика: «y = f(x)» или «f(x) = …». */
