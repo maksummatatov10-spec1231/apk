@@ -128,9 +128,9 @@ public final class Table {
             }
             return;
         }
-        // правило без тупиков: 25 с без гола — вбрасывание в центр (шайба зажата у стенки, см. README)
+        // правило без тупиков: 8 с без гола — вбрасывание в центр (шайба зажата у стенки, см. README)
         noGoalTime += dt;
-        if (noGoalTime > 25f) {
+        if (noGoalTime > 8f) {
             noGoalTime = 0f;
             serveTo = puckY < H / 2 ? 0 : 1;
             serveDelay = 1.2f;
@@ -195,12 +195,13 @@ public final class Table {
         puckY += puckVY * h;
 
         // стены: левая/правая
+        // отражаем только шайбу, которая летит в стенку (иначе вылетающая от стенки шайба «отражается» обратно)
         if (puckX < PUCK_R) {
             puckX = PUCK_R;
-            wallBounce(Math.abs(puckVX), true);
+            if (puckVX < 0) wallBounce(Math.abs(puckVX), true);
         } else if (puckX > W - PUCK_R) {
             puckX = W - PUCK_R;
-            wallBounce(Math.abs(puckVX), true);
+            if (puckVX > 0) wallBounce(Math.abs(puckVX), true);
         }
         // верхняя стенка / ворота
         if (puckY < PUCK_R) {
@@ -209,7 +210,7 @@ public final class Table {
                 return;
             }
             puckY = PUCK_R;
-            wallBounce(Math.abs(puckVY), false);
+            if (puckVY < 0) wallBounce(Math.abs(puckVY), false);
         }
         if (puckY > H - PUCK_R) {
             if (Math.abs(puckX - W / 2) < GOAL_HALF - PUCK_R * 0.3f) {
@@ -217,7 +218,7 @@ public final class Table {
                 return;
             }
             puckY = H - PUCK_R;
-            wallBounce(Math.abs(puckVY), false);
+            if (puckVY > 0) wallBounce(Math.abs(puckVY), false);
         }
         // ракетки
         for (int s = 0; s < 2; s++) collidePaddle(s);
@@ -271,6 +272,7 @@ public final class Table {
         puckX = tx;
         puckY = ty;
         // остаточное перекрытие: шайба выталкивается из ракетки
+
         pushPuckOutOfPaddle(s);
         if (listener != null && vn < -60f) listener.onPaddleHit(-vn, s);
     }
@@ -353,7 +355,7 @@ public final class Table {
             if (mPuckY < 500 && mVY > -80) {
                 // шайба почти у бота и медленная: бьём сразу
                 tgtX = aiAimX[s];
-                tgtY = mPuckY + (PUCK_R + PADDLE_R) * 0.6f;
+                tgtY = mPuckY - (PUCK_R + PADDLE_R) * 0.6f;   // заход сзади: ракетка выше шайбы (к своим воротам), бьёт к воротам соперника
             }
         } else {
             // оборона: стоим между шайбой и своими воротами

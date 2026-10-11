@@ -12,7 +12,7 @@ APK-файлы приложений репозитория. Все подпис�
 ## SHA-256
 
 ```
-ff41c09d7a647ad2f838f2cb42895794e057365bee534be0dc07284a3f179b52  AirHockey-v1.0.apk
+a511a26160c450c3281009ea8354c01eb0dca980795347a8548edde12b4ac21f  AirHockey-v1.0.apk
 66a9342dfee7fc25311be50cce97d92f36d101ba61203b96b7ac67712484b59a  AirHotkeyChallenge-v1.0.apk
 9b6b0a3df04ef33157e2815d8dc5ebef5ff1168cf2aebe600f460ec95825693b  CalcSolver-v1.1.apk
 337a533a4ef98d4126a08b2a9488098923c54c48351150c76b0dbc0e8a92207d  Hello-v1.0.apk
