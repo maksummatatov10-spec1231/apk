@@ -28,6 +28,7 @@ public final class MainActivity extends Activity {
         };
         sounds = new AndroidSounds(this);
         view = new SpamtonView(this, sounds, store, new Random());
+        view.setPortrait(android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.spamton));
         setContentView(view);
     }
 

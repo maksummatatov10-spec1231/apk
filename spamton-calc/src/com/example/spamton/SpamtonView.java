@@ -1,6 +1,7 @@
 package com.example.spamton;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
@@ -39,6 +40,8 @@ public final class SpamtonView extends View {
     private final Store store;
     private final Random rnd;
     private final Paint paint = new Paint();
+    /** Портрет Спамтона (PNG из ресурсов). Если null — рисуется процедурный пиксельный спрайт. */
+    private Bitmap portrait;
 
     private final Spamton spamton;
     private Battle battle;
@@ -628,7 +631,7 @@ public final class SpamtonView extends View {
 
         drawFrame(c, spriteBox.left - 8 * u, spriteBox.top - 8 * u,
                 spriteBox.width() + 16 * u, spriteBox.height() + 16 * u, INK, WHITE, 3 * u);
-        SpamtonSprite.draw(c, spriteBox.left, spriteBox.top, spriteCell, paint);
+        drawPortrait(c, spriteBox.left, spriteBox.top, spriteCell, spriteBox.width());
         if (spamton.isAlly()) {
             drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "VERIFIED ALLY", GREEN);
         } else {
@@ -735,7 +738,7 @@ public final class SpamtonView extends View {
         // Спрайт и полосы HP.
         float cell = 3.4f * u;
         float sx = 22 * u, sy = 24 * u;
-        SpamtonSprite.draw(c, sx, sy, cell, paint);
+        drawPortrait(c, sx, sy, cell, SpamtonSprite.COLS * cell);
         int sHp = battle != null ? battle.spamtonHp() : 0;
         int pHp = battle != null ? battle.playerHp() : 0;
         drawHpBar(c, hpBoxA, "SPAMTON", sHp, Battle.SPAMTON_MAX_HP, YELLOW);
@@ -814,6 +817,27 @@ public final class SpamtonView extends View {
         c.drawRect(box.left, barTop, box.left + box.width() * frac, barTop + barH, paint);
         drawText(c, value + "/" + max, box.right - 52 * u, barTop + barH - 2 * u, 10 * u, BLACK, true);
     }
+
+    /** Портрет масштабируется до ширины width; без портрета — процедурный спрайт с клеткой cell. */
+    private void drawPortrait(Canvas c, float x, float y, float cell, float width) {
+        if (portrait == null) {
+            SpamtonSprite.draw(c, x, y, cell, paint);
+            return;
+        }
+        float s = width / portrait.getWidth();
+        c.save();
+        c.translate(x, y);
+        c.scale(s, s);
+        c.drawBitmap(portrait, 0, 0, bitmapPaint);
+        c.restore();
+    }
+
+    /** Задаёт портрет (вызывается из MainActivity после загрузки ресурса). */
+    public void setPortrait(Bitmap bitmap) {
+        portrait = bitmap;
+    }
+
+    private final Paint bitmapPaint = new Paint();
 
     private void drawTag(Canvas c, float x, float y, String text, int color) {
         drawText(c, text, x, y, 12 * u, color, true);

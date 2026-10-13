@@ -41,6 +41,8 @@ final class Env {
         view = new SpamtonView(new Context(), sounds, store, new Random(seed));
         view.layout(0, 0, W, H);
         view.onSizeChanged(W, H, 0, 0);
+        // Тот же портрет, что грузит MainActivity из res/drawable-nodpi/spamton.png.
+        view.setPortrait(new android.graphics.Bitmap("res/drawable-nodpi/spamton.png", 126, 126));
     }
 
     /** Журнал команд рисования текущего кадра (см. scripts/render_ops.py). */

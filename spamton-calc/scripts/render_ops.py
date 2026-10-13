@@ -31,6 +31,9 @@ def rgb(argb):
     return ((v >> 16) & 255, (v >> 8) & 255, v & 255)
 
 
+BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+
 def render(ops_path, png_path):
     img = Image.new("RGB", (W, H), (0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -69,6 +72,12 @@ def render(ops_path, png_path):
                     ImageDraw.Draw(mask).text((x, y), text, font=fnt, fill=255, anchor="ls")
                     mask = Image.composite(mask, Image.new("L", (W, H), 0), _clip_mask(clip))
                     img.paste(layer, (0, 0), mask)
+            elif kind == "I":
+                path, x, y, w, h = rest.split()
+                src_path = os.path.join(BASE, path)
+                pic = Image.open(src_path).convert("RGBA")
+                pic = pic.resize((max(1, round(float(w))), max(1, round(float(h)))), Image.NEAREST)
+                img.paste(pic, (round(float(x)), round(float(y))), pic)
             elif kind == "C":
                 clip = tuple(float(v) for v in rest.split())
             elif kind == "S":

@@ -16,6 +16,7 @@ public class Paint {
     public void setTypeface(Typeface t) { }
     public void setFakeBoldText(boolean b) { bold = b; }
     public void setAntiAlias(boolean b) { }
+    public void setFilterBitmap(boolean b) { }
 
     public float measureText(String s) {
         return s.length() * MONO_ADVANCE * textSize;
