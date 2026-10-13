@@ -67,7 +67,7 @@ final class BattleLogic {
         for (int i = 0; i < 3; i++) {
             morseOptions[i] = (i == morseCorrect) ? morseWord : wrong[w++];
         }
-        line = Phrases.TURN_START[rng.nextInt(Phrases.TURN_START.length)];
+        line = Phrases.pick(Phrases.TURN_START, rng);
     }
 
     private int indexOfOther(int exclude, String not) {
@@ -103,7 +103,8 @@ final class BattleLogic {
         }
         lastDamage = dmg;
         junkHp = Math.max(0, junkHp - dmg);
-        line = dmg == 0 ? Phrases.FIGHT_MISS : (acc > 0.9 ? Phrases.FIGHT_CRIT : Phrases.FIGHT_HIT);
+        line = dmg == 0 ? Phrases.pick(Phrases.FIGHT_MISS, rng)
+                : (acc > 0.9 ? Phrases.pick(Phrases.FIGHT_CRIT, rng) : Phrases.pick(Phrases.FIGHT_HIT, rng));
         phase = Phase.JUNK_TALK;
         return dmg;
     }
@@ -112,14 +113,14 @@ final class BattleLogic {
         requireMenu();
         switch (act) {
             case LOOK:
-                line = Phrases.LOOK;
+                line = Phrases.pick(Phrases.LOOK, rng);
                 phase = Phase.JUNK_TALK;
                 break;
             case HAGGLE:
                 satisfy = Math.min(SATISFY_MAX, satisfy + HAGGLE_GAIN);
                 batteries = Math.min(BATTERY_MAX, batteries + 1);
                 nextPattern = Pattern.BOOSTED;
-                line = Phrases.HAGGLE;
+                line = Phrases.pick(Phrases.HAGGLE, rng);
                 phase = Phase.JUNK_TALK;
                 break;
             case MORSE:
@@ -137,11 +138,11 @@ final class BattleLogic {
         if (right) {
             satisfy = Math.min(SATISFY_MAX, satisfy + MORSE_RIGHT);
             nextPattern = Pattern.REDUCED;
-            line = Phrases.MORSE_RIGHT;
+            line = Phrases.pick(Phrases.MORSE_RIGHT, rng);
         } else {
             satisfy = Math.max(0, satisfy + MORSE_WRONG);
             nextPattern = Pattern.BOOSTED;
-            line = Phrases.MORSE_WRONG;
+            line = Phrases.pick(Phrases.MORSE_WRONG, rng);
         }
         phase = Phase.JUNK_TALK;
         return right;
@@ -158,7 +159,7 @@ final class BattleLogic {
         if (batteries <= 0) return false;
         batteries--;
         playerHp = Math.min(PLAYER_MAX, playerHp + BATTERY_HEAL);
-        line = Phrases.BATTERY;
+        line = Phrases.pick(Phrases.BATTERY, rng);
         phase = Phase.JUNK_TALK;
         return true;
     }
@@ -177,7 +178,7 @@ final class BattleLogic {
             line = Phrases.SPARED;
             return true;
         }
-        line = Phrases.MERCY_FAIL;
+        line = Phrases.pick(Phrases.MERCY_FAIL, rng);
         return false;
     }
 

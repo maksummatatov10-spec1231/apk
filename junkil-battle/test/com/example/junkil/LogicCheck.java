@@ -23,7 +23,7 @@ public final class LogicCheck {
                 expected == null ? actual == null : expected.equals(actual));
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         morse();
         fight();
         morseGame();
@@ -32,6 +32,7 @@ public final class LogicCheck {
         arena();
         darkBin();
         phrases();
+        darkOnlyInFinale();
         System.out.println("Логика: пройдено " + passed + ", провалено " + failed);
         if (failed > 0) System.exit(1);
     }
@@ -262,5 +263,27 @@ public final class LogicCheck {
         check("INTRO есть", Phrases.INTRO.length() > 10);
         check("LOST есть", Phrases.LOST.length() > 10);
         check("WON есть", Phrases.WON.length() > 10);
+        for (String[] pool : new String[][] {Phrases.TURN_START, Phrases.FIGHT_MISS, Phrases.FIGHT_HIT,
+                Phrases.FIGHT_CRIT, Phrases.LOOK, Phrases.HAGGLE, Phrases.MORSE_RIGHT,
+                Phrases.MORSE_WRONG, Phrases.BATTERY, Phrases.MERCY_FAIL}) {
+            check("пул реплик не пуст", pool.length >= 3);
+            for (String s : pool) check("реплика не пуста", s != null && !s.isEmpty());
+        }
+    }
+
+    /** Обычный ход (без forced) никогда не ставит «Тёмный бак»: он только в финальном залпе. */
+    static void darkOnlyInFinale() throws Exception {
+        java.lang.reflect.Field f = ArenaSim.class.getDeclaredField("schedule");
+        f.setAccessible(true);
+        int dark = 0;
+        for (int i = 0; i < 3000; i++) {
+            ArenaSim s = new ArenaSim(new Random(i), BattleLogic.Pattern.NORMAL, "SOS", null);
+            for (Object o : (java.util.List<?>) f.get(s)) {
+                java.lang.reflect.Field k = o.getClass().getDeclaredField("kind");
+                k.setAccessible(true);
+                if (k.get(o) == ArenaSim.Attack.DARK) dark++;
+            }
+        }
+        eq("обычный ход: ТЁМНЫЙ БАК не выпадает", 0, dark);
     }
 }
