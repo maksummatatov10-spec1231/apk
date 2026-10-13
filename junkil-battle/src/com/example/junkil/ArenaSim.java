@@ -168,6 +168,9 @@ final class ArenaSim {
         this.rng = rng;
         this.pattern = pattern;
         this.morseWord = morseWord;
+        // финальный залп идёт только до открытия крышки, без пустой арены после него
+        this.duration = forced != null && forced.length == 1 && forced[0] == Attack.DARK
+                ? DARK_LENGTH + 1.5f : DURATION;
         buildSchedule(forced);
     }
 
@@ -304,8 +307,11 @@ final class ArenaSim {
         heartY = clamp(y, HEART / 2f, H - HEART / 2f);
     }
 
+    /** Длительность хода: обычного 14 с, финального залпа «Тёмного бака» — чуть дольше открытия крышки. */
+    private final float duration;
+
     boolean finished() {
-        return time >= DURATION;
+        return time >= duration;
     }
 
     /** Шаг симуляции. Возвращает число новых попаданий (BattleView сразу отнимает ХП игрока). */

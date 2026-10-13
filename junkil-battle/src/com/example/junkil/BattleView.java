@@ -464,8 +464,11 @@ final class BattleView extends View {
             float half = (ARENA_B - ARENA_T) / 2f * lid;
             rect(c, ARENA_L, ARENA_T, ARENA_R, ARENA_T + half, LID);
             rect(c, ARENA_L, ARENA_B - half, ARENA_R, ARENA_B, LID);
-            rect(c, ARENA_L, ARENA_T + half - 2f, ARENA_R, ARENA_T + half, YELLOW);
-            rect(c, ARENA_L, ARENA_B - half, ARENA_R, ARENA_B - half + 2f, YELLOW);
+            // кромка створок: жёлтая, пока крышка движется; у закрытой крышки — тонкий шов
+            if (lid < 0.999f) {
+                rect(c, ARENA_L, ARENA_T + half - 2f, ARENA_R, ARENA_T + half, YELLOW);
+                rect(c, ARENA_L, ARENA_B - half, ARENA_R, ARENA_B - half + 2f, YELLOW);
+            }
             // свет очков вокруг сердца: три ступени, чуть пульсируют
             float pulse = 1f + 0.04f * (float) Math.sin(sim.time * 6.0);
             light = 30f * lid * pulse;
@@ -494,6 +497,17 @@ final class BattleView extends View {
                     break;
             }
         }
+        // ручка и рёбра бака на створках крышки
+        if (lid > 0.5f) {
+            float half = (ARENA_B - ARENA_T) / 2f * lid;
+            for (int k = 0; k < 4; k++) {
+                float x = ARENA_L + 22f + k * 34f;
+                rect(c, x, ARENA_T + half - 14f, x + 2f, ARENA_T + half, 0xFF1E1E2C);
+                rect(c, x, ARENA_B - half, x + 2f, ARENA_B - half + 14f, 0xFF1E1E2C);
+            }
+            rect(c, hx - 14f, ARENA_T + half - 6f, hx + 14f, ARENA_T + half - 2f, 0xFF3A3A50);
+            rect(c, hx - 14f, ARENA_B - half + 2f, hx + 14f, ARENA_B - half + 6f, 0xFF3A3A50);
+        }
         // подсказки «Тёмного бака»: жёлтый пунктир от края к сердцу, мигает перед выстрелом
         for (float[] g : sim.glints) {
             if (((int) (g[4] * 10f)) % 2 != 0) continue;
@@ -507,6 +521,11 @@ final class BattleView extends View {
             }
         }
         c.restore();
+        // реплика Джанкила: справа от арены, пока идёт залп
+        if (logic.isFinale() && sim.time < 3.6f) {
+            text(c, "ТЫ ЧТО ДЕЛАЕШЬ", 532, 262, 15, YELLOW, true, false);
+            text(c, "В МОЁМ БАКЕ?!", 532, 284, 15, YELLOW, true, false);
+        }
         heart(c, hx, hy, 11f);
     }
 
@@ -757,6 +776,7 @@ final class BattleView extends View {
         ArenaSim.Attack[] forced = logic.isFinale() ? new ArenaSim.Attack[] {ArenaSim.Attack.DARK} : null;
         sim = new ArenaSim(rng, p, logic.morseWord, forced);
         lastAttackStarts = 0;
+        if (forced != null) sounds.play("junkil_bak");   // реплика Джанкила перед залпом
     }
 
     private int lastAttackStarts;

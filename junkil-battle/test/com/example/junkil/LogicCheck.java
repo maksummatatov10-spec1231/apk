@@ -215,6 +215,18 @@ public final class LogicCheck {
         }
         check("ТЁМНЫЙ БАК не выпадает в обычных ходах", !seen);
 
+        // финальный залп заканчивается сразу после открытия крышки, без пустой арены
+        ArenaSim fin = new ArenaSim(new Random(3), BattleLogic.Pattern.NORMAL, "SOS",
+                new ArenaSim.Attack[] {ArenaSim.Attack.DARK});
+        float ft = 0f;
+        while (!fin.finished() && ft < 30f) {
+            fin.moveHeartTo(ArenaSim.W / 2f, ArenaSim.H / 2f);
+            fin.update(1f / 60f);
+            ft += 1f / 60f;
+        }
+        check("финальный залп кончается до 9 с (" + ft + ")", ft < 9f);
+        check("финальный залп кончается после открытия крышки", ft > 7.3f);
+
         // два залпа по три: шесть подсказок и шесть выстрелов, ход заканчивается по времени
         ArenaSim d = new ArenaSim(new Random(5), BattleLogic.Pattern.NORMAL, "SOS",
                 new ArenaSim.Attack[] {ArenaSim.Attack.DARK});

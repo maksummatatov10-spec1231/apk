@@ -222,6 +222,7 @@ public final class UiCheck {
         w.tapLogical(400, 384);
         w.tapLogical(400, 400);
         eq("ХП Джанкила 0 — финал «Тёмный бак»", BattleLogic.Phase.ARENA, w.logic().phase);
+        check("реплика «ТЫ ЧТО ДЕЛАЕШЬ В МОЁМ БАКЕ?!» звучит перед залпом", w.sounds.count("junkil_bak") == 1);
         w.advance(15f);   // залп проходит, потом победа
         eq("ХП Джанкила 0 — победа после залпа", BattleLogic.Phase.WON, w.logic().phase);
         check("победа — конец", w.logic().isOver());
