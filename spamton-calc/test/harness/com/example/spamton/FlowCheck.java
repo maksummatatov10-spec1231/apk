@@ -152,7 +152,7 @@ public final class FlowCheck {
         touch(e.view, a[0], a[1]);
         check("верный ответ снижает HP Спамтона", e.view.battleForTest().spamtonHp() < startHp);
         e.settle();
-        e.advance(7f);
+        e.advance(13f);
         e.settle();
         check("после атаки снова вопрос", e.view.battleForTest().phase().name().equals("QUIZ"));
 
@@ -169,7 +169,7 @@ public final class FlowCheck {
                 touch(lose.view, w[0], w[1]);
             }
             lose.settle();
-            lose.advance(7f);
+            lose.advance(13f);
         }
         check("без победы бой продолжается (не выходит в калькулятор)", lose.view.modeForTest().equals("BATTLE"));
     }
@@ -186,7 +186,7 @@ public final class FlowCheck {
                 touch(e.view, a[0], a[1]);
             }
             e.settle();
-            e.advance(7f);
+            e.advance(13f);
         }
         e.settle();
         e.advance(4f);

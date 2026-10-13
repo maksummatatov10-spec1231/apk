@@ -2,6 +2,9 @@ package com.example.spamton;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
+import android.graphics.Path;
+import android.graphics.Shader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
@@ -91,7 +94,15 @@ public final class SpamtonView extends View {
     private int flashKey = -1;
     private float spriteDownAt = -1f;
     private float clock;
-    private boolean dragging;
+    /* Джойстик и таймеры фазы атаки. */
+    private boolean joyActive;
+    private final RectF joyBox = new RectF();
+    private float joyCx, joyCy, joyR, knobR;
+    private float joyStickX, joyStickY;
+    private float tauntTimer, hurtCooldown, coinCooldown;
+    private final Path shapePath = new Path();
+    private final Paint texPaint = new Paint();
+    private Bitmap bulletTexture;
 
     /* ---------- раскладка (пересчитывается в onSizeChanged) ---------- */
     private float u = 1f;                  // 1 единица = W/360
@@ -217,6 +228,12 @@ public final class SpamtonView extends View {
         hpBoxA.set(130 * u, 26 * u, w - 16 * u, 44 * u);
         hpBoxB.set(130 * u, 68 * u, w - 16 * u, 86 * u);
         arenaBox.set(20 * u, 206 * u, w - 20 * u, 206 * u + (w - 40 * u) * 130f / 200f);
+        // Джойстик под ареной: тёмный диск с серым кольцом, как на образце.
+        joyCx = w / 2;
+        joyCy = arenaBox.bottom + 122 * u;
+        joyR = 56 * u;
+        knobR = 22 * u;
+        joyBox.set(joyCx - joyR * 1.25f, joyCy - joyR * 1.25f, joyCx + joyR * 1.25f, joyCy + joyR * 1.25f);
         float ay = arenaBox.bottom + 16 * u;
         float bw = (w - 40 * u - 10 * u) / 2f, bh = 52 * u;
         for (int i = 0; i < 4; i++) {
@@ -289,16 +306,7 @@ public final class SpamtonView extends View {
             blinkTimer += dt;
             if (takeoverTimer <= 0) startBattle();
         }
-        if (mode == Mode.BATTLE && stage == Stage.ATTACK && field != null) {
-            float step = 1f / 60f;
-            float left = dt;
-            while (left > 0 && !field.finished()) {
-                float d = Math.min(step, left);
-                field.update(d);
-                left -= d;
-            }
-            if (field.finished()) finishAttack();
-        }
+        if (mode == Mode.BATTLE && stage == Stage.ATTACK && field != null) updateAttack(dt);
     }
 
     private String tickerText() {
@@ -345,6 +353,11 @@ public final class SpamtonView extends View {
                 setMood(Mood.SCARED);
                 field = new BulletField(rnd);
                 field.moveHeartTo(BulletField.WIDTH / 2, BulletField.HEIGHT / 2);
+                tauntTimer = 1.2f;
+                hurtCooldown = 0;
+                coinCooldown = 0;
+                joyActive = false;
+                joyStickX = joyStickY = 0;
                 break;
             case WIN_END:
                 finishBattleWin();
@@ -485,6 +498,22 @@ public final class SpamtonView extends View {
             "...Я... НА ТВОЕЙ СТОРОНЕ?! БЕЗ СПАМА, ТОЛЬКО ТОЧНЫЕ ОТВЕТЫ!!",
             "НЕБЕСА!!!",
     };
+    /* Реплики фазы атаки: комментарии по ходу уклонения. */
+    static final String[] TAUNT_LINES = {
+            "ЛОВИ КРОМЕРЫ!!! ОНИ ЖЁЛТЫЕ, ОНИ ВКУСНЫЕ!!",
+            "УВОРАЧИВАЙСЯ, ЭТО БЕСПЛАТНО!!!",
+            "[[СКИДКА]] ДЕВЯНОСТО ПРОЦЕНТОВ!!! ТОЛЬКО СЕЙЧАС!!",
+            "НЕ СДАВАЙСЯ!!! ...ТО ЕСТЬ СДАВАЙСЯ, ПОЖАЛУЙСТА!!",
+    };
+    static final String[] HURT_LINES = {
+            "ОЙ!! ЭТО БЫЛО БОЛЬНО... ЗА ДЕНЬГИ!!",
+            "ПОДОЖДИ!! ТЫ ЖЕ МОЙ КЛИЕНТ!!",
+            "ХА!! ПОПАЛ, ДРУГ!! ...НЕТ, Я ПОПАЛ!!",
+    };
+    static final String[] COIN_LINES = {
+            "МОИ КРОМЕРЫ!!! ОТДАЙ!!!",
+            "ЖАДИНА!!! ТЫ ЖЕ ОТНИМАЕШЬ МОЮ ПРИБЫЛЬ!!",
+    };
     static final String[] POKE_LINES = {
             "НЕ ТРОГАЙ!!! ...ШУЧУ, ТРОГАЙ. ЭТО БЕСПЛАТНО!!",
             "ДЕРЖИ ДОЛЬШЕ, И Я ЗАХВАЧУ ТВОЙ ТЕЛЕФОН!!!",
@@ -599,15 +628,57 @@ public final class SpamtonView extends View {
         stage = Stage.OUTCOME;
     }
 
-    private void finishAttack() {
-        battle.finishAttack(field.hits());
-        field = null;
-        if (battle.phase() == Battle.Phase.LOST) {
+    /**
+     * Фаза атаки: урон применяется в момент попадания (HP меняется сразу), Спамтон комментирует.
+     * Бой заканчивается мгновенно при нуле HP любой стороны, иначе — по таймеру.
+     */
+    private void updateAttack(float dt) {
+        tauntTimer -= dt;
+        hurtCooldown -= dt;
+        coinCooldown -= dt;
+        if (tauntTimer <= 0) {
+            tauntTimer = 2.8f + rnd.nextFloat() * 1.6f;
+            say(pick(TAUNT_LINES), After.NONE);
+        }
+        float step = 1f / 60f;
+        float left = dt;
+        while (left > 0 && !field.finished()) {
+            float d = Math.min(step, left);
+            left -= d;
+            BulletField.Step st = field.update(d);
+            if (st.hits > 0) {
+                battle.takeBulletHits(st.hits);
+                sounds.play("error");
+                setMood(Mood.SCARED);
+                if (hurtCooldown <= 0) {
+                    hurtCooldown = 2.4f;
+                    say(pick(HURT_LINES), After.NONE);
+                }
+            }
+            if (st.coins > 0) {
+                battle.catchCoins(st.coins);
+                sounds.play("ding");
+                setMood(Mood.SAD);
+                if (coinCooldown <= 0) {
+                    coinCooldown = 1.8f;
+                    say(pick(COIN_LINES), After.NONE);
+                }
+            }
+            if (battle.phase() == Battle.Phase.WON || battle.phase() == Battle.Phase.LOST) break;
+        }
+        if (battle.phase() == Battle.Phase.WON) {
+            field = null;
+            stage = Stage.OUTCOME;
+            finishBattleWin();
+        } else if (battle.phase() == Battle.Phase.LOST) {
+            field = null;
             setMood(Mood.EVIL);
             say(pick(LOSE_LINES), After.LOSE_END);
             stage = Stage.OUTCOME;
             sounds.play("lose");
-        } else {
+        } else if (field.finished()) {
+            field = null;
+            battle.endAttack();
             battle.nextQuestion();
             setMood(Mood.FOCUSED);
             stage = Stage.QUIZ;
@@ -669,15 +740,18 @@ public final class SpamtonView extends View {
                 }
             }
             if (stage == Stage.ATTACK && field != null) {
-                if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-                    if (arenaBox.contains(x, y) || dragging) {
-                        dragging = true;
-                        float fx = (x - arenaBox.left) / arenaBox.width() * BulletField.WIDTH;
-                        float fy = (y - arenaBox.top) / arenaBox.height() * BulletField.HEIGHT;
-                        field.moveHeartTo(fx, fy);
-                    }
+                if (action == MotionEvent.ACTION_DOWN && joyBox.contains(x, y)) joyActive = true;
+                if (joyActive && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)) {
+                    float dx = (x - joyCx) / joyR, dy = (y - joyCy) / joyR;
+                    float len = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (len > 1f) { dx /= len; dy /= len; }
+                    joyStickX = dx;
+                    joyStickY = dy;
+                    field.setStick(dx, dy);
                 } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    dragging = false;
+                    joyActive = false;
+                    joyStickX = joyStickY = 0;
+                    field.setStick(0, 0);
                 }
             }
         }
@@ -860,7 +934,8 @@ public final class SpamtonView extends View {
             }
         }
         if (stage == Stage.ATTACK) {
-            drawText(c, "ТЯНИ СЕРДЦЕ. УВОРАЧИВАЙСЯ ОТ РЕКЛАМЫ!", 20 * u, arenaBox.bottom + 30 * u, 13 * u, CYAN, true);
+            drawText(c, "ДЖОЙСТИК: УВОРАЧИВАЙСЯ ОТ БЕЛЫХ, ЛОВИ ЖЁЛТЫЕ!", 20 * u, arenaBox.bottom + 30 * u, 12 * u, CYAN, true);
+            drawJoystick(c);
         }
     }
 
@@ -868,13 +943,21 @@ public final class SpamtonView extends View {
         float sc = arenaBox.width() / BulletField.WIDTH;
         c.save();
         c.clipRect(arenaBox.left, arenaBox.top, arenaBox.right, arenaBox.bottom);
+        // Жёлтые кромеры: тёмный контур, золотой диск, внутренний блик.
+        for (BulletField.Coin k : field.coins()) {
+            float kx = arenaBox.left + k.x * sc, ky = arenaBox.top + k.y * sc;
+            float kr = BulletField.COIN_R * sc;
+            paint.setColor(BLACK);
+            c.drawCircle(kx, ky, kr + 2 * u, paint);
+            paint.setColor(YELLOW);
+            c.drawCircle(kx, ky, kr, paint);
+            paint.setColor(0xFFB8860B);
+            c.drawCircle(kx, ky, kr * 0.5f, paint);
+        }
+        // Белые пули разных форм: чёрный контур и текстура (BitmapShader на устройстве).
         for (BulletField.Bullet b : field.bullets()) {
-            paint.setColor(b.label.equals("КУПОН") ? YELLOW : WHITE);
-            float bx = arenaBox.left + b.x * sc, by = arenaBox.top + b.y * sc;
-            c.drawRect(bx, by, bx + b.w * sc, by + b.h * sc, paint);
-            if (!b.label.equals("КУПОН")) {
-                drawText(c, b.label, bx, by + b.h * sc - 2 * u, 9 * u, BLACK, true);
-            }
+            fillShape(c, b, sc, 1.22f, paint, true);
+            fillShape(c, b, sc, 1f, bulletTexture != null ? texPaint : paint, false);
         }
         float hs = BulletField.HEART * sc;
         float hx = arenaBox.left + field.heartX() * sc - hs / 2, hy = arenaBox.top + field.heartY() * sc - hs / 2;
@@ -884,6 +967,48 @@ public final class SpamtonView extends View {
         float left = BulletField.DURATION - field.time();
         drawText(c, String.format("%.1f", Math.max(0, left)), arenaBox.right - 40 * u, arenaBox.top + 16 * u,
                 12 * u, WHITE, true);
+        drawText(c, "КРОМЕРЫ: " + field.caught(), arenaBox.left + 8 * u, arenaBox.top + 16 * u, 11 * u, YELLOW, true);
+    }
+
+    /** Фигура пули: контур по точкам outline, повёрнутый на rot, масштаб scale относительно центра. */
+    private void fillShape(Canvas c, BulletField.Bullet b, float sc, float scale, Paint p, boolean outlineOnly) {
+        float cx = arenaBox.left + b.cx() * sc, cy = arenaBox.top + b.cy() * sc;
+        float hw = b.w * sc * scale, hh = b.h * sc * scale;
+        float cos = (float) Math.cos(b.rot), sin = (float) Math.sin(b.rot);
+        shapePath.reset();
+        int n = b.outline.length / 2;
+        for (int i = 0; i < n; i++) {
+            float px = b.outline[2 * i] * hw * 2, py = b.outline[2 * i + 1] * hh * 2;
+            float rx = px * cos - py * sin, ry = px * sin + py * cos;
+            if (i == 0) shapePath.moveTo(cx + rx, cy + ry);
+            else shapePath.lineTo(cx + rx, cy + ry);
+        }
+        shapePath.close();
+        if (outlineOnly) paint.setColor(BLACK);
+        c.drawPath(shapePath, p);
+    }
+
+    /** Джойстик: серое кольцо, тёмный диск и ручка, которая смещается по стику. */
+    private void drawJoystick(Canvas c) {
+        paint.setColor(GREY);
+        c.drawCircle(joyCx, joyCy, joyR, paint);
+        paint.setColor(0xFF0B0B0B);
+        c.drawCircle(joyCx, joyCy, joyR - 4 * u, paint);
+        float kx = joyCx + joyStickX * (joyR - knobR), ky = joyCy + joyStickY * (joyR - knobR);
+        paint.setColor(0xFF555555);
+        c.drawCircle(kx, ky, knobR + 2 * u, paint);
+        paint.setColor(0xFF9A9A9A);
+        c.drawCircle(kx, ky, knobR, paint);
+        paint.setColor(0xFF2B2B2B);
+        c.drawCircle(kx, ky, knobR * 0.45f, paint);
+    }
+
+    /** Текстура белых пуль (res/drawable-nodpi/bullet_tex.png). Без неё пули белые. */
+    public void setBulletTexture(Bitmap bitmap) {
+        bulletTexture = bitmap;
+        if (bitmap != null) {
+            texPaint.setShader(new BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT));
+        }
     }
 
     private void drawHpBar(Canvas c, RectF box, String label, int value, int max, int color) {

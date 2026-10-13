@@ -35,6 +35,9 @@ public final class MainActivity extends Activity {
             if (id != 0) portraits.put(m, android.graphics.BitmapFactory.decodeResource(getResources(), id));
         }
         view.setPortraits(portraits);
+        // Текстура белых пуль (бесшовная, повторяется плиткой).
+        int texId = getResources().getIdentifier("bullet_tex", "drawable", getPackageName());
+        if (texId != 0) view.setBulletTexture(android.graphics.BitmapFactory.decodeResource(getResources(), texId));
         setContentView(view);
     }
 

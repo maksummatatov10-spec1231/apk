@@ -94,16 +94,15 @@ public final class LogicCheck {
         check("верный вариант на позиции correctIndex", q.options[q.correctIndex] == q.answer());
         check("ответ неотрицателен", q.answer() >= 0);
 
-        // Вопросы в разных раундах корректны (сумма/произведение/корень).
+        // Вопросы в разных раундах корректны; верный ответ наносит урон и уводит в атаку.
         Battle r = new Battle(new Random(11));
         for (int i = 0; i < 300; i++) {
             Battle.Question qq = r.nextQuestion();
             check("вопрос раунда " + r.round() + " имеет уникальные варианты", distinct(qq.options));
             if (r.phase() == Battle.Phase.QUIZ) {
-                // Отвечаем верно и неверно, чтобы цикл фаз работал.
                 Battle.Outcome o = r.choose(qq.correctIndex);
                 check("верный ответ наносит урон не меньше 8", o.damageToSpamton >= 8);
-                if (r.phase() == Battle.Phase.ATTACK) r.finishAttack(0);
+                if (r.phase() == Battle.Phase.ATTACK) r.endAttack();
                 if (r.phase() == Battle.Phase.WON) break;
             }
         }
@@ -112,23 +111,26 @@ public final class LogicCheck {
         Battle w = new Battle(new Random(5));
         Battle.Question first = w.nextQuestion();
         int wrongIdx = (first.correctIndex + 1) % 4;
-        // На полном HP лечить нечего.
         Battle.Outcome o0 = w.choose(wrongIdx);
         check("на полном HP неверный ответ не лечит", o0.healedSpamton == 0 && !o0.correct);
-        w.finishAttack(0);
-        // Сначала верный ответ наносит урон, потом неверный лечит.
+        w.endAttack();
         Battle.Question qq2 = w.nextQuestion();
         Battle.Outcome hit = w.choose(qq2.correctIndex);
         check("верный ответ — урон", hit.damageToSpamton >= 8 && hit.correct);
-        w.finishAttack(0);
+        w.endAttack();
         Battle.Question qq3 = w.nextQuestion();
         Battle.Outcome o1 = w.choose((qq3.correctIndex + 1) % 4);
         check("неверный ответ — не урон", !o1.correct && o1.damageToSpamton == 0);
         check("неверный ответ — лечение", o1.healedSpamton == Battle.HEAL_ON_WRONG);
         check("после неверного фаза атаки", w.phase() == Battle.Phase.ATTACK);
         check("HP Спамтона не выше максимума", w.spamtonHp() <= Battle.SPAMTON_MAX_HP);
-        w.finishAttack(2);
-        check("урон от пуль списывается", w.playerHp() == Battle.PLAYER_MAX_HP - 2 * Battle.DAMAGE_PER_BULLET);
+
+        // Урон от пуль — сразу, а не в конце атаки.
+        int before = w.playerHp();
+        w.takeBulletHits(2);
+        check("урон от пуль применяется сразу", w.playerHp() == before - 2 * Battle.DAMAGE_PER_BULLET);
+        check("после попадания бой ещё в атаке", w.phase() == Battle.Phase.ATTACK);
+        w.endAttack();
         check("после атаки снова вопрос", w.phase() == Battle.Phase.QUIZ);
 
         // Серия верных ответов: урон растёт, но не больше 16.
@@ -137,38 +139,51 @@ public final class LogicCheck {
         for (int i = 0; i < 3; i++) {
             Battle.Question qq = c.nextQuestion();
             Battle.Outcome out = c.choose(qq.correctIndex);
-            if (c.phase() == Battle.Phase.ATTACK) c.finishAttack(0);
+            if (c.phase() == Battle.Phase.ATTACK) c.endAttack();
             if (i > 0) check("урон растёт с серией", out.damageToSpamton > lastDmg);
             check("урон не выше 16", out.damageToSpamton <= 16);
             lastDmg = out.damageToSpamton;
         }
 
-        // Полная победа: Спамтон умирает, фаза WON.
+        // Ловля кромеров: урон Спамтону сразу; при нуле — победа прямо в атаке.
+        Battle k = new Battle(new Random(12));
+        k.nextQuestion();
+        k.choose(k.question().correctIndex);
+        check("перед ловлей — атака", k.phase() == Battle.Phase.ATTACK);
+        int hpBefore = k.spamtonHp();
+        int dealt = k.catchCoins(1);
+        check("кромер наносит урон сразу", dealt == Battle.COIN_DAMAGE && k.spamtonHp() == hpBefore - Battle.COIN_DAMAGE);
+        k.endAttack();
+        check("кромеры без победы — снова вопрос", k.phase() == Battle.Phase.QUIZ);
+        k.nextQuestion();
+        k.choose(k.question().correctIndex);
+        int need = (int) Math.ceil(k.spamtonHp() / (double) Battle.COIN_DAMAGE);
+        k.catchCoins(need);
+        check("поймав достаточно кромеров, побеждаешь в атаке", k.phase() == Battle.Phase.WON && k.spamtonHp() == 0);
+
+        // Полная победа верными ответами: Спамтон умирает, фаза WON.
         Battle win = new Battle(new Random(2));
         boolean won = false;
         for (int i = 0; i < 50 && !won; i++) {
             Battle.Question qq = win.nextQuestion();
             Battle.Outcome out = win.choose(qq.correctIndex);
             if (win.phase() == Battle.Phase.WON) { won = true; break; }
-            win.finishAttack(0);
+            win.endAttack();
         }
         check("верные ответы в итоге побеждают Спамтона", won && win.spamtonHp() == 0);
 
-        // Поражение: HP игрока до нуля — фаза LOST.
+        // Поражение: HP игрока до нуля — фаза LOST сразу, без endAttack.
         Battle lose = new Battle(new Random(4));
-        for (int i = 0; i < 100 && lose.phase() != Battle.Phase.LOST; i++) {
-            if (lose.phase() == Battle.Phase.QUIZ) {
-                Battle.Question qq = lose.question() != null ? lose.question() : lose.nextQuestion();
-                lose.choose((qq.correctIndex + 1) % 4);
-            } else if (lose.phase() == Battle.Phase.ATTACK) {
-                lose.finishAttack(10);
-            }
-        }
-        check("поражение при нуле HP игрока", lose.phase() == Battle.Phase.LOST && lose.playerHp() == 0);
+        lose.nextQuestion();
+        lose.choose((lose.question().correctIndex + 1) % 4);
+        for (int i = 0; i < 20 && lose.phase() == Battle.Phase.ATTACK; i++) lose.takeBulletHits(3);
+        check("поражение при нуле HP игрока (сразу)", lose.phase() == Battle.Phase.LOST && lose.playerHp() == 0);
 
         // Ошибки использования фаз.
         try { new Battle(new Random(1)).choose(0); check("choose без вопроса", false); }
         catch (IllegalStateException e) { check("choose без вопроса — ошибка", true); }
+        try { new Battle(new Random(1)).takeBulletHits(1); check("пули вне атаки", false); }
+        catch (IllegalStateException e) { check("пули вне атаки — ошибка", true); }
     }
 
     static void bulletTests() {
@@ -182,14 +197,41 @@ public final class LogicCheck {
                 f.heartX() <= BulletField.WIDTH - BulletField.HEART / 2
                         && f.heartY() <= BulletField.HEIGHT - BulletField.HEART / 2);
 
-        // Симуляция: неподвижное сердце в центре — попадания возможны, но фаза кончается ровно по времени.
+        // Джойстик двигает сердце по направлению, с ограничением рамкой.
+        BulletField j = new BulletField(new Random(4));
+        j.moveHeartTo(50, 50);
+        j.setStick(1f, 0f);
+        j.update(0.5f);
+        check("джойстик вправо двигает сердце вправо", j.heartX() > 50 + 20 && Math.abs(j.heartY() - 50) < 1e-3);
+        j.setStick(0f, 0f);
+        float stillX = j.heartX();
+        j.update(0.5f);
+        check("отпущенный джойстик не двигает сердце", Math.abs(j.heartX() - stillX) < 1e-3);
+
+        // Симуляция: неподвижное сердце в центре — фаза кончается ровно по времени.
         BulletField g = new BulletField(new Random(21));
         g.moveHeartTo(BulletField.WIDTH / 2, BulletField.HEIGHT / 2);
         int steps = 0;
-        while (!g.finished() && steps < 100000) { g.update(1f / 60f); steps++; }
+        java.util.Set<BulletField.Kind> kinds = new java.util.HashSet<>();
+        while (!g.finished() && steps < 100000) {
+            g.update(1f / 60f);
+            for (BulletField.Bullet b : g.bullets()) kinds.add(b.kind);
+            steps++;
+        }
         check("атака заканчивается по времени", g.finished() && g.time() >= BulletField.DURATION);
         check("пули создаются", steps > 300);
-        check("попадания согласованы со счётчиком", g.hits() >= 0);
+        check("разные формы пуль появляются", kinds.size() >= 3);
+        check("попадания согласованы со счётчиком", g.hits() >= 0 && g.caught() >= 0);
+
+        // Кромер на сердце ловится; далеко — нет.
+        BulletField k = new BulletField(new Random(0));
+        k.moveHeartTo(60, 60);
+        k.coins().add(new BulletField.Coin(60, 60, 0f, 0f));
+        BulletField.Step st = k.update(1f / 60f);
+        check("кромер на сердце ловится", st.coins == 1 && k.caught() == 1 && k.coins().isEmpty());
+        k.coins().add(new BulletField.Coin(180, 10, 0f, 0f));
+        k.update(1f / 60f);
+        check("далёкий кромер не ловится", k.caught() == 1 && k.coins().size() == 1);
 
         // Попадание: пуля прямо над сердцем.
         BulletField h = new BulletField(new Random(0));
@@ -198,6 +240,14 @@ public final class LogicCheck {
         check("пересечение AABB", h.hitsHeart(b));
         BulletField.Bullet far = new BulletField.Bullet("X", 150, 10, 8, 8, 0, 0);
         check("без пересечения", !h.hitsHeart(far));
+
+        // Контуры фигур: чётное число координат, внутри квадрата [-0.5, 0.5].
+        for (BulletField.Kind kind : BulletField.Kind.values()) {
+            float[] o = BulletField.outlineFor(kind, 10, 10);
+            boolean ok = o.length >= 6 && o.length % 2 == 0;
+            for (float v : o) ok &= v >= -0.5f - 1e-6 && v <= 0.5f + 1e-6;
+            check("контур " + kind + " корректен", ok);
+        }
     }
 
     static boolean distinct(int[] a) {

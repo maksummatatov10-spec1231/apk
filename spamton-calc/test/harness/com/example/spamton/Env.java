@@ -48,6 +48,7 @@ final class Env {
             if (f.exists()) portraits.put(m, new android.graphics.Bitmap(f.getPath(), 126, 126));
         }
         view.setPortraits(portraits);
+        view.setBulletTexture(new android.graphics.Bitmap("res/drawable-nodpi/bullet_tex.png", 256, 256));
     }
 
     /** Журнал команд рисования текущего кадра (см. scripts/render_ops.py). */

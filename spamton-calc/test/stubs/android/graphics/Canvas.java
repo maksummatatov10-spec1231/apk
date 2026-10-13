@@ -67,6 +67,30 @@ public class Canvas {
            .append(tx + dst.right * sx).append(' ').append(ty + dst.bottom * sy).append('\n');
     }
 
+    /** Круг (заливка): O cx cy r ARGB. */
+    public void drawCircle(float cx, float cy, float r, Paint p) {
+        ops.append("O ").append(tx + cx * sx).append(' ').append(ty + cy * sy).append(' ')
+           .append(r * sx).append(' ').append(hex(p.color)).append('\n');
+    }
+
+    /**
+     * Многоугольник из Path: P ARGB x y ... (заливка цветом) или PT путь_к_текстуре ARGB x y ...
+     * (заливка плиткой текстуры, как BitmapShader с REPEAT).
+     */
+    public void drawPath(Path path, Paint p) {
+        StringBuilder sb = new StringBuilder();
+        if (p.shader instanceof BitmapShader) {
+            sb.append("PT ").append(((BitmapShader) p.shader).bitmap.path).append(' ');
+        } else {
+            sb.append("P ");
+        }
+        sb.append(hex(p.color));
+        for (float[] pt : path.points) {
+            sb.append(' ').append(tx + pt[0] * sx).append(' ').append(ty + pt[1] * sy);
+        }
+        ops.append(sb).append('\n');
+    }
+
     public void clipRect(float l, float t, float r, float b) {
         ops.append("C ").append(tx + l * sx).append(' ').append(ty + t * sy).append(' ')
            .append(tx + r * sx).append(' ').append(ty + b * sy).append('\n');

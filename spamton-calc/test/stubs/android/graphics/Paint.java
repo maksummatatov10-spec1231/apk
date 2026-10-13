@@ -10,8 +10,10 @@ public class Paint {
     int color = 0xFF000000;
     float textSize = 12f;
     boolean bold;
+    Shader shader;
 
     public void setColor(int c) { color = c; }
+    public void setShader(Shader s) { shader = s; }
     public void setTextSize(float s) { textSize = s; }
     public void setTypeface(Typeface t) { }
     public void setFakeBoldText(boolean b) { bold = b; }

@@ -78,6 +78,36 @@ def render(ops_path, png_path):
                 pic = Image.open(src_path).convert("RGBA")
                 pic = pic.resize((max(1, round(float(w))), max(1, round(float(h)))), Image.NEAREST)
                 img.paste(pic, (round(float(x)), round(float(y))), pic)
+            elif kind in ("P", "PT", "O"):
+                # P ARGB x y ... — многоугольник цветом; PT путь ARGB x y ... — многоугольник текстурой;
+                # O cx cy r ARGB — круг. Обрезка и цвет как у остальных команд.
+                mask = Image.new("L", (W, H), 0)
+                if kind == "O":
+                    cx, cy, r, col = rest.split()
+                    cx, cy, r = float(cx), float(cy), float(r)
+                    ImageDraw.Draw(mask).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+                    layer = Image.new("RGB", (W, H), rgb(col))
+                else:
+                    tokens = rest.split()
+                    tex = None
+                    if kind == "PT":
+                        tex = tokens.pop(0)
+                    col = tokens.pop(0)
+                    pts = [float(v) for v in tokens]
+                    poly = list(zip(pts[0::2], pts[1::2]))
+                    ImageDraw.Draw(mask).polygon(poly, fill=255)
+                    if tex is None:
+                        layer = Image.new("RGB", (W, H), rgb(col))
+                    else:
+                        tile = Image.open(os.path.join(BASE, tex)).convert("RGB")
+                        tw, th = tile.size
+                        layer = Image.new("RGB", (W, H))
+                        for ty_ in range(0, H, th):
+                            for tx_ in range(0, W, tw):
+                                layer.paste(tile, (tx_, ty_))
+                if clip is not None:
+                    mask = Image.composite(mask, Image.new("L", (W, H), 0), _clip_mask(clip))
+                img.paste(layer, (0, 0), mask)
             elif kind == "J":
                 # J путь sl st sr sb dl dt dr db: кусок картинки (пиксели) в прямоугольник назначения
                 path, sl, st, sr, sb, dl, dt, dr, db = rest.split()

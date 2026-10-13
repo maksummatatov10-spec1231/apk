@@ -13,6 +13,8 @@ public final class Battle {
     public static final int SPAMTON_MAX_HP = 60;
     public static final int PLAYER_MAX_HP = 20;
     public static final int DAMAGE_PER_BULLET = 2;
+    /** Урон Спамтону за каждый пойманный жёлтый кромер. */
+    public static final int COIN_DAMAGE = 3;
     public static final int HEAL_ON_WRONG = 4;
 
     public enum Phase { QUIZ, ATTACK, WON, LOST }
@@ -112,11 +114,33 @@ public final class Battle {
         return new Outcome(false, 0, healed, pick(HEAL_LINES));
     }
 
-    /** Фаза уклонения окончена: списывает урон за попадания. */
-    public void finishAttack(int hits) {
+    /**
+     * Белые пули попали в сердце: урон игроку сразу. При нуле HP — фаза LOST, атака прерывается.
+     */
+    public void takeBulletHits(int n) {
         if (phase != Phase.ATTACK) throw new IllegalStateException("not in attack");
-        playerHp = Math.max(0, playerHp - hits * DAMAGE_PER_BULLET);
-        phase = playerHp == 0 ? Phase.LOST : Phase.QUIZ;
+        if (n <= 0) return;
+        playerHp = Math.max(0, playerHp - n * DAMAGE_PER_BULLET);
+        if (playerHp == 0) phase = Phase.LOST;
+    }
+
+    /**
+     * Сердце поймало жёлтые кромеры: урон Спамтону сразу. При нуле HP — фаза WON.
+     * Возвращает урон, нанесённый этим вызовом.
+     */
+    public int catchCoins(int n) {
+        if (phase != Phase.ATTACK) throw new IllegalStateException("not in attack");
+        if (n <= 0) return 0;
+        int before = spamtonHp;
+        spamtonHp = Math.max(0, spamtonHp - n * COIN_DAMAGE);
+        if (spamtonHp == 0) phase = Phase.WON;
+        return before - spamtonHp;
+    }
+
+    /** Атака закончилась по времени: если бой не завершён, снова вопрос. */
+    public void endAttack() {
+        if (phase != Phase.ATTACK) throw new IllegalStateException("not in attack");
+        phase = Phase.QUIZ;
     }
 
     /** Вопрос по раунду: сложность растёт. */
