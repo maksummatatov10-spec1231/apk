@@ -11,7 +11,7 @@ import java.util.Map;
 final class AndroidSounds implements Sounds {
 
     private static final String[] NAMES = {
-        "select", "confirm", "hurt", "hit", "heal", "whoosh", "win", "lose", "mercy", "back",
+        "select", "confirm", "hurt", "hit", "heal", "whoosh", "win", "lose", "mercy", "back", "lid", "glint",
         "morse_sos", "morse_junk", "morse_free", "morse_buy", "morse_sale", "morse_help", "morse_yes", "morse_no",
     };
 

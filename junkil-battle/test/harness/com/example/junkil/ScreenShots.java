@@ -57,6 +57,20 @@ public final class ScreenShots {
         arena.tapLogical(400, 400);
         arena.advance(3.2f);
         save(arena.shot(), dir, "07-arena.png");
+        // ТЁМНЫЙ БАК: крышка закрывается, подсказки-пунктиры, выстрелы из темноты
+        Env dark = new Env(108);
+        dark.tapButton("FIGHT");
+        dark.advance(0.5555f);
+        dark.tapLogical(400, 384);
+        dark.tapLogical(400, 400);
+        dark.view.sim = new ArenaSim(new java.util.Random(7), BattleLogic.Pattern.NORMAL, "SOS",
+                new ArenaSim.Attack[] {ArenaSim.Attack.DARK});
+        dark.advance(1.25f);
+        save(dark.shot(), dir, "11-dark-lid.png");
+        dark.advance(0.6f);
+        save(dark.shot(), dir, "12-dark-glints.png");
+        dark.advance(1.6f);
+        save(dark.shot(), dir, "13-dark-shot.png");
 
         Env won = new Env(108);
         won.logic().junkHp = 4;

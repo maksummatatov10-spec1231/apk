@@ -30,6 +30,7 @@ public final class LogicCheck {
         actAndItems();
         mercyAndEnd();
         arena();
+        darkBin();
         phrases();
         System.out.println("Логика: пройдено " + passed + ", провалено " + failed);
         if (failed > 0) System.exit(1);
@@ -194,6 +195,47 @@ public final class LogicCheck {
             t += 1f / 60f;
         }
         return sim.spawned;
+    }
+
+    /** «Тёмный бак»: залпы, подсказки, крышка и свет. */
+    static void darkBin() {
+        // входит в обычный пул атак (за 60 ходов встречается хотя бы раз)
+        boolean seen = false;
+        for (long seed = 1; seed <= 60 && !seen; seed++) {
+            ArenaSim s = new ArenaSim(new Random(seed), BattleLogic.Pattern.NORMAL, "SOS");
+            run(s);
+            seen = s.attackLog.contains(ArenaSim.Attack.DARK);
+        }
+        check("ТЁМНЫЙ БАК есть в пуле атак", seen);
+
+        // два залпа по три: шесть подсказок и шесть выстрелов, ход заканчивается по времени
+        ArenaSim d = new ArenaSim(new Random(5), BattleLogic.Pattern.NORMAL, "SOS",
+                new ArenaSim.Attack[] {ArenaSim.Attack.DARK});
+        float t = 0f;
+        float lidMid = -1f, lidFull = -1f, lidOpen = -1f;
+        boolean glintSeenLive = false;
+        while (!d.finished() && t < 30f) {
+            d.moveHeartTo(ArenaSim.W / 2f, ArenaSim.H / 2f);
+            d.update(1f / 60f);
+            t += 1f / 60f;
+            if (Math.abs(t - 0.95f) < 1f / 120f) lidMid = d.lidClosed();
+            if (Math.abs(t - 1.6f) < 1f / 120f) lidFull = d.lidClosed();
+            if (Math.abs(t - 7.6f) < 1f / 120f) lidOpen = d.lidClosed();
+            if (!d.glints.isEmpty()) glintSeenLive = true;
+        }
+        eq("подсказок шесть", 6, d.glintStarts);
+        eq("выстрелов из темноты шесть (предметы)", 6, d.spawned);
+        check("подсказки видны во время атаки", glintSeenLive);
+        check("крышка закрывается плавно (0 < lid < 1 в 0.95 с)", lidMid > 0f && lidMid < 1f);
+        check("крышка полностью закрыта (1 в 1.6 с)", lidFull == 1f);
+        eq("крышка открыта после атаки", 0f, lidOpen);
+        check("после атаки арена светлая", !d.darkNow());
+
+        // шаги хода: обычная атака не затемняет арену
+        ArenaSim plain = new ArenaSim(new Random(9), BattleLogic.Pattern.NORMAL, "SOS",
+                new ArenaSim.Attack[] {ArenaSim.Attack.AIM});
+        run(plain);
+        check("ПРИЦЕЛ не затемняет арену", !plain.darkNow() && plain.glints.isEmpty());
     }
 
     static void phrases() {

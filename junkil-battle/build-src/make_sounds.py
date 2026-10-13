@@ -119,6 +119,10 @@ def main():
     write("win", np.concatenate([tone(523, 0.12, decay=8), tone(659, 0.12, decay=8),
                                  tone(784, 0.12, decay=8), tone(1047, 0.4, decay=4)]))
     write("lose", np.concatenate([glide(392, 300, 0.3, decay=4), glide(294, 196, 0.5, decay=3)]))
+    # «Тёмный бак»: скрип крышки (падение высоты + тихий низкий шум) и блик подсказки
+    creak = glide(260, 150, 0.5, decay=2.5)
+    write("lid", creak + soft_noise(0.5, cutoff=500, seed=3)[:len(creak)] * 0.25)
+    write("glint", np.concatenate([tone(1320, 0.08, decay=20), tone(1760, 0.1, decay=18)]), peak=0.22)
     for word in ["SOS", "JUNK", "FREE", "BUY", "SALE", "HELP", "YES", "NO"]:
         write("morse_" + word.lower(), morse_tone(word), peak=0.3)
 

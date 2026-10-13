@@ -448,13 +448,38 @@ final class BattleView extends View {
         }
     }
 
+    private static final int LID = 0xFF101018;
+    private static final int GLOW_OUT = 0xFF1E1E2A, GLOW_MID = 0xFF2C2C3E, GLOW_IN = 0xFF3A3A50;
+
     private void drawArena(Canvas c) {
         frame(c, ARENA_L, ARENA_T, ARENA_R, ARENA_B, BORDER, 0xFF000000, 4);
-        // снаряды не выходят за квадрат арены (падающие сверху появляются из-за рамки)
+        float lid = sim.lidClosed();
+        float hx = AX + sim.heartX, hy = AY + sim.heartY;
+        float light = 0f;
+        // снаряды и подсказки не выходят за квадрат арены (падающие сверху появляются из-за рамки)
         c.save();
         c.clipRect(X(ARENA_L + 4), Y(ARENA_T + 4), X(ARENA_R - 4), Y(ARENA_B - 4));
+        if (lid > 0f) {
+            // «Тёмный бак»: две створки крышки сходятся к центру, у края жёлтая кромка
+            float half = (ARENA_B - ARENA_T) / 2f * lid;
+            rect(c, ARENA_L, ARENA_T, ARENA_R, ARENA_T + half, LID);
+            rect(c, ARENA_L, ARENA_B - half, ARENA_R, ARENA_B, LID);
+            rect(c, ARENA_L, ARENA_T + half - 2f, ARENA_R, ARENA_T + half, YELLOW);
+            rect(c, ARENA_L, ARENA_B - half, ARENA_R, ARENA_B - half + 2f, YELLOW);
+            // свет очков вокруг сердца: три ступени, чуть пульсируют
+            float pulse = 1f + 0.04f * (float) Math.sin(sim.time * 6.0);
+            light = 30f * lid * pulse;
+            circle(c, hx, hy, light, GLOW_OUT);
+            circle(c, hx, hy, light * 0.72f, GLOW_MID);
+            circle(c, hx, hy, light * 0.4f, GLOW_IN);
+        }
         for (ArenaSim.Item it : sim.items) {
             float px = AX + it.x, py = AY + it.y;
+            if (lid > 0f) {
+                // в темноте видно только то, что попало в круг света
+                float ddx = px - hx, ddy = py - hy;
+                if (Math.sqrt(ddx * ddx + ddy * ddy) > light + it.r + 2f) continue;
+            }
             switch (it.kind) {
                 case DOT:
                     circle(c, px, py, 3, TEXT);
@@ -469,8 +494,20 @@ final class BattleView extends View {
                     break;
             }
         }
+        // подсказки «Тёмного бака»: жёлтый пунктир от края к сердцу, мигает перед выстрелом
+        for (float[] g : sim.glints) {
+            if (((int) (g[4] * 10f)) % 2 != 0) continue;
+            float ox = AX + g[0], oy = AY + g[1], tx = AX + g[2], ty = AY + g[3];
+            float dx = tx - ox, dy = ty - oy;
+            float len = (float) Math.sqrt(dx * dx + dy * dy);
+            int n = Math.max(1, (int) (len / 6f));
+            for (int k = 0; k <= n; k++) {
+                float u = k / (float) n;
+                circle(c, ox + dx * u, oy + dy * u, 1.5f, YELLOW);
+            }
+        }
         c.restore();
-        heart(c, AX + sim.heartX, AY + sim.heartY, 11f);
+        heart(c, hx, hy, 11f);
     }
 
     private void drawPlayer(Canvas c) {
@@ -716,6 +753,8 @@ final class BattleView extends View {
     }
 
     private int lastAttackStarts;
+    private int lastGlintStarts;
+    private ArenaSim lastSim;
 
     /** Конец арены: поражение, если HP 0, иначе следующий ход. Сбрасывает поле и джойстик. */
     private void endArenaNow() {
@@ -755,9 +794,18 @@ final class BattleView extends View {
                 shake = Math.max(shake, 0.2f);
                 sounds.play("hurt");
             }
+            if (sim != lastSim) {
+                lastSim = sim;
+                lastAttackStarts = 0;
+                lastGlintStarts = 0;
+            }
             if (sim.attackStarts > lastAttackStarts) {
                 lastAttackStarts = sim.attackStarts;
-                sounds.play("whoosh");
+                sounds.play(sim.currentAttack() == ArenaSim.Attack.DARK ? "lid" : "whoosh");
+            }
+            if (sim.glintStarts > lastGlintStarts) {
+                lastGlintStarts = sim.glintStarts;
+                sounds.play("glint");
             }
             if (logic.playerHp <= 0 || sim.finished()) {
                 endArenaNow();

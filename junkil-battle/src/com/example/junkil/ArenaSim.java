@@ -29,7 +29,7 @@ final class ArenaSim {
 
     enum Kind { STAR, GEAR, CRESCENT, COIN, BOLT, CASSETTE, DOT, DASH }
 
-    enum Attack { MORSE, AIM, WALL, RING, BOUNCE }
+    enum Attack { MORSE, AIM, WALL, RING, BOUNCE, DARK }
 
     static final class Item {
         final Kind kind;
@@ -55,13 +55,19 @@ final class ArenaSim {
         final float at;
         final Attack attack;
         final boolean dash;   // МОРЗЕ: тире (стена) или точка (колючка)
-        final boolean start;  // начало атаки: подпись и звук
+        final boolean start;  // начало атаки: звук
+        final int kind;       // 0 — обычное, 1 — подсказка «Тёмного бака», 2 — выстрел из темноты
 
         Event(float at, Attack attack, boolean dash, boolean start) {
+            this(at, attack, dash, start, 0);
+        }
+
+        Event(float at, Attack attack, boolean dash, boolean start, int kind) {
             this.at = at;
             this.attack = attack;
             this.dash = dash;
             this.start = start;
+            this.kind = kind;
         }
     }
 
@@ -143,22 +149,40 @@ final class ArenaSim {
     private Attack current;
     private final List<Event> schedule = new ArrayList<>();
     private int next;
+    /** «Тёмный бак»: подсказки (ox, oy, tx, ty, осталось секунд) и очередь выстрелов. */
+    final List<float[]> glints = new ArrayList<>();
+    private final List<float[]> pendingDark = new ArrayList<>();
+    /** Сколько подсказок уже появилось (BattleView проигрывает звук на каждую). */
+    int glintStarts;
+    private float attackStartTime;
+    private float darkUntil;
+    static final float GLINT_TIME = 1.5f;
+    static final float DARK_LENGTH = 6.5f;
 
     ArenaSim(Random rng, BattleLogic.Pattern pattern, String morseWord) {
+        this(rng, pattern, morseWord, null);
+    }
+
+    /** forced — заданный порядок атак (для проверок и снимков); null — обычный ход. */
+    ArenaSim(Random rng, BattleLogic.Pattern pattern, String morseWord, Attack[] forced) {
         this.rng = rng;
         this.pattern = pattern;
         this.morseWord = morseWord;
-        buildSchedule();
+        buildSchedule(forced);
     }
 
     /** Расписание хода: МОРЗЕ первой, затем две случайные атаки. */
-    private void buildSchedule() {
+    private void buildSchedule(Attack[] forced) {
         List<Attack> order = new ArrayList<>();
-        order.add(Attack.MORSE);
-        List<Attack> rest = new ArrayList<>(List.of(Attack.AIM, Attack.WALL, Attack.RING, Attack.BOUNCE));
-        Collections.shuffle(rest, rng);
-        order.add(rest.get(0));
-        order.add(rest.get(1));
+        if (forced != null) {
+            order.addAll(java.util.Arrays.asList(forced));
+        } else {
+            order.add(Attack.MORSE);
+            List<Attack> rest = new ArrayList<>(List.of(Attack.AIM, Attack.WALL, Attack.RING, Attack.BOUNCE, Attack.DARK));
+            Collections.shuffle(rest, rng);
+            order.add(rest.get(0));
+            order.add(rest.get(1));
+        }
 
         float start = 0.8f;
         for (Attack a : order) {
@@ -210,6 +234,19 @@ final class ArenaSim {
             case BOUNCE:
                 schedule.add(new Event(start + 0.3f, a, false, false));
                 return start + 3.5f;
+            case DARK: {
+                // два залпа по три выстрела: сначала подсказка-пунктир на 1.5 с, потом выстрел из темноты
+                float w0 = start + 0.4f;
+                for (int wave = 0; wave < 2; wave++) {
+                    float tw = w0 + wave * 3.0f;
+                    for (int i = 0; i < 3; i++) {
+                        float tg = tw + i * 0.25f;
+                        schedule.add(new Event(tg, a, false, false, 1));
+                        schedule.add(new Event(tg + GLINT_TIME, a, false, false, 2));
+                    }
+                }
+                return start + DARK_LENGTH;
+            }
             default:
                 return start + 1f;
         }
@@ -285,6 +322,12 @@ final class ArenaSim {
             run(schedule.get(next++));
         }
 
+        for (int i = glints.size() - 1; i >= 0; i--) {
+            float[] g = glints.get(i);
+            g[4] -= dt;
+            if (g[4] <= 0f) glints.remove(i);
+        }
+
         int newHits = 0;
         for (int i = items.size() - 1; i >= 0; i--) {
             Item it = items.get(i);
@@ -315,6 +358,14 @@ final class ArenaSim {
             startAttack(e.attack);
             return;
         }
+        if (e.kind == 1) {
+            addGlint();
+            return;
+        }
+        if (e.kind == 2) {
+            fireDark();
+            return;
+        }
         float sp = speedScale();
         switch (e.attack) {
             case MORSE:
@@ -342,6 +393,47 @@ final class ArenaSim {
         attackStarts++;
         attackLog.add(a);
         current = a;
+        attackStartTime = time;
+        darkUntil = time + DARK_LENGTH;
+    }
+
+    /** Подсказка: пунктир от края арены к сердцу в этот момент; выстрел пойдёт по нему. */
+    private void addGlint() {
+        float ox, oy;
+        switch (rng.nextInt(4)) {
+            case 0: ox = -6f; oy = rng.nextFloat() * H; break;
+            case 1: ox = W + 6f; oy = rng.nextFloat() * H; break;
+            case 2: ox = rng.nextFloat() * W; oy = -6f; break;
+            default: ox = rng.nextFloat() * W; oy = H + 6f; break;
+        }
+        float tx = heartX, ty = heartY;
+        pendingDark.add(new float[] {ox, oy, tx, ty});
+        glints.add(new float[] {ox, oy, tx, ty, GLINT_TIME});
+        glintStarts++;
+    }
+
+    private void fireDark() {
+        if (pendingDark.isEmpty()) return;
+        float[] g = pendingDark.remove(0);
+        float[] v = aim(g[0], g[1], g[2], g[3], speedScale() * 120f);
+        Item it = new Item(Kind.BOLT, rng.nextInt(TEX_COUNT), g[0], g[1], v[0], v[1], 8f);
+        it.spin = (rng.nextFloat() * 2f - 1f) * 3f;
+        spawn(it);
+    }
+
+    /** Степень закрытия крышки: 0 — открыта, 1 — полностью закрыта (арена тёмная). */
+    float lidClosed() {
+        if (current != Attack.DARK) return 0f;
+        float left = darkUntil - time;
+        if (left <= 0f) return 0f;
+        float in = Math.min(1f, (time - attackStartTime) / 0.5f);
+        float out = Math.min(1f, left / 0.4f);
+        return Math.max(0f, Math.min(in, out));
+    }
+
+    /** Тёмная арена: предметы видны только в круге света вокруг сердца. */
+    boolean darkNow() {
+        return lidClosed() > 0f;
     }
 
     /** Фигура из верхнего края, летящая прямо в текущую позицию сердца. */

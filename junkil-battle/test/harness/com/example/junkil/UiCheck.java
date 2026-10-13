@@ -27,6 +27,7 @@ public final class UiCheck {
         morseFlow();
         fightFlow();
         arenaFlow();
+        darkFlow();
         endings();
         System.out.println("Интерфейс: пройдено " + passed + ", провалено " + failed);
         if (failed > 0) System.exit(1);
@@ -189,6 +190,28 @@ public final class UiCheck {
         j.view.onTouchEvent(android.view.MotionEvent.obtain(android.view.MotionEvent.ACTION_UP,
                 j.pxX(BattleView.JOY_X + 25), j.pxY(BattleView.JOY_Y)));
         eq("отпускание сбрасывает стик", 0f, j.view.sim.stickX);
+    }
+
+    /** «Тёмный бак» во вьюхе: звуки крышки и подсказок, крышка и круг света в кадре. */
+    static void darkFlow() {
+        Env e = new Env(41);
+        e.logic().satisfy = 0;
+        e.tapButton("FIGHT");
+        e.advance(0.5555f);
+        e.tapLogical(400, 384);
+        e.tapLogical(400, 400);
+        // порядок атак задан явно: только ТЁМНЫЙ БАК
+        e.view.sim = new ArenaSim(new java.util.Random(7), BattleLogic.Pattern.NORMAL, "SOS",
+                new ArenaSim.Attack[] {ArenaSim.Attack.DARK});
+        e.advance(1.0f);   // атака стартует на 0.8 с, крышка закрывается за 0.5 с
+        check("звук крышки (lid) при старте атаки", e.sounds.count("lid") == 1);
+        check("крышка закрывается: арена затемнена", e.view.sim.darkNow());
+        e.advance(0.6f);   // ~1.6 с: крышка закрыта, первая подсказка (1.2 с) уже дала звук
+        check("подсказка даёт звук (glint)", e.sounds.count("glint") >= 1);
+        String ops = e.shot();
+        check("крышка нарисована (тёмная заливка створок)", ops.contains("FF101018"));
+        check("круг света нарисован (ступени свечения)", ops.contains("FF2C2C3E") && ops.contains("FF3A3A50"));
+        check("подсказка-пунктир нарисована", ops.contains("FFFFE600"));
     }
 
     static void endings() {
