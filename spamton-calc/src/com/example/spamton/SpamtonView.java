@@ -989,18 +989,20 @@ public final class SpamtonView extends View {
     }
 
     /** Джойстик: серое кольцо, тёмный диск и ручка, которая смещается по стику. */
+    /**
+     * Джойстик как на референсе: тёмный круг с тонкой серой каймой и серое кольцо в центре
+     * (ручка, которая сдвигается при нажатии).
+     */
     private void drawJoystick(Canvas c) {
-        paint.setColor(GREY);
-        c.drawCircle(joyCx, joyCy, joyR, paint);
-        paint.setColor(0xFF0B0B0B);
-        c.drawCircle(joyCx, joyCy, joyR - 4 * u, paint);
-        float kx = joyCx + joyStickX * (joyR - knobR), ky = joyCy + joyStickY * (joyR - knobR);
         paint.setColor(0xFF555555);
-        c.drawCircle(kx, ky, knobR + 2 * u, paint);
-        paint.setColor(0xFF9A9A9A);
+        c.drawCircle(joyCx, joyCy, joyR, paint);
+        paint.setColor(0xFF161616);
+        c.drawCircle(joyCx, joyCy, joyR - 3 * u, paint);
+        float kx = joyCx + joyStickX * (joyR - knobR), ky = joyCy + joyStickY * (joyR - knobR);
+        paint.setColor(0xFF8A8A8A);
         c.drawCircle(kx, ky, knobR, paint);
         paint.setColor(0xFF2B2B2B);
-        c.drawCircle(kx, ky, knobR * 0.45f, paint);
+        c.drawCircle(kx, ky, knobR * 0.72f, paint);
     }
 
     /** Текстура белых пуль (res/drawable-nodpi/bullet_tex.png). Без неё пули белые. */
