@@ -23,6 +23,7 @@ public final class UiCheck {
 
     public static void main(String[] args) {
         menuFlow();
+        joystickMenu();
         morseFlow();
         fightFlow();
         arenaFlow();
@@ -46,11 +47,49 @@ public final class UiCheck {
         eq("батарейка тратится", 1, e.logic().batteries);
         eq("батарейка лечит", 20, e.logic().playerHp);
         eq("после батарейки фаза JUNK_TALK", BattleLogic.Phase.JUNK_TALK, e.logic().phase);
-        e.tapLogical(180, 400);
+        e.tapLogical(400, 400);
         eq("тап по тексту продолжает к арене", BattleLogic.Phase.ARENA, e.logic().phase);
         check("арена создана", e.view.sim != null);
         e.advance(11f);
         check("арена закончилась по таймеру", e.logic().phase != BattleLogic.Phase.ARENA);
+    }
+
+    /** Undertale: левый джойстик выбирает пункт, Z подтверждает, X возвращает назад. */
+    static void joystickMenu() {
+        Env e = new Env(31);
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X + 60, BattleView.JOY_Y);
+        e.joyRelease();
+        eq("джойстик вправо: курсор на ДЕЙСТВИЕ", 1, e.view.cursorForTest());
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X + 60, BattleView.JOY_Y);
+        e.joyRelease();
+        eq("второй шаг вправо: курсор на ПРЕДМЕТ", 2, e.view.cursorForTest());
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X - 60, BattleView.JOY_Y);
+        e.joyRelease();
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X - 60, BattleView.JOY_Y);
+        e.joyRelease();
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X - 60, BattleView.JOY_Y);
+        e.joyRelease();
+        eq("влево за границу: курсор не уходит ниже 0", 0, e.view.cursorForTest());
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X + 60, BattleView.JOY_Y);
+        e.joyRelease();
+        e.tapZ();
+        eq("Z на ДЕЙСТВИИ открывает подменю", "ACT", e.view.subForTest());
+        eq("в подменю курсор сбрасывается", 0, e.view.cursorForTest());
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X, BattleView.JOY_Y + 60);
+        e.joyRelease();
+        eq("вниз в подменю: курсор 1 (СИГНАЛ)", 1, e.view.cursorForTest());
+        e.tapZ();
+        eq("Z на СИГНАЛе переводит в MORSE", BattleLogic.Phase.MORSE, e.logic().phase);
+        e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X, BattleView.JOY_Y + 60);
+        e.joyRelease();
+        eq("в MORSE вниз: курсор 1", 1, e.view.cursorForTest());
+        e.tapZ();
+        check("Z в MORSE отвечает на вариант", e.logic().phase == BattleLogic.Phase.JUNK_TALK);
+
+        Env x = new Env(32);
+        x.tapButton("ACT");
+        x.tapLogical(BattleView.X_X, BattleView.X_Y);
+        eq("X возвращает из подменю", "", x.view.subForTest());
     }
 
     static void morseFlow() {
@@ -80,7 +119,7 @@ public final class UiCheck {
         eq("БОЙ: фаза FIGHT", BattleLogic.Phase.FIGHT, e.logic().phase);
         e.advance(0.5555f);  // маркер почти в центре
         int before = e.logic().junkHp;
-        e.tapLogical(180, 384);
+        e.tapLogical(400, 384);
         eq("попадание сразу уменьшает ХП Джанкила", true, e.logic().junkHp < before);
         int acc = e.view.lastAccuracyPctForTest();
         check("точность записана (" + acc + "%)", acc >= 0 && acc <= 100);
@@ -89,7 +128,7 @@ public final class UiCheck {
         Env miss = new Env(25);
         miss.tapButton("FIGHT");
         miss.advance(0.0f);       // маркер у левого края
-        miss.tapLogical(40, 384);
+        miss.tapLogical(400, 384);
         eq("промах по краю не наносит урона", 90, miss.logic().junkHp);
     }
 
@@ -98,8 +137,8 @@ public final class UiCheck {
         e.logic().satisfy = 0;
         e.tapButton("FIGHT");
         e.advance(0.5555f);
-        e.tapLogical(180, 384);
-        e.tapLogical(180, 400);
+        e.tapLogical(400, 384);
+        e.tapLogical(400, 400);
         eq("арена после текста", BattleLogic.Phase.ARENA, e.logic().phase);
         e.advance(1.5f);
         check("на арене есть предметы", e.view.sim.items.size() > 0 || e.view.sim.spawned > 0);
@@ -108,8 +147,8 @@ public final class UiCheck {
         Env j = new Env(27);
         j.tapButton("FIGHT");
         j.advance(0.5555f);
-        j.tapLogical(180, 384);
-        j.tapLogical(180, 400);
+        j.tapLogical(400, 384);
+        j.tapLogical(400, 400);
         float hx0 = j.view.sim.heartX;
         j.view.onTouchEvent(android.view.MotionEvent.obtain(android.view.MotionEvent.ACTION_DOWN,
                 j.pxX(BattleView.JOY_X), j.pxY(BattleView.JOY_Y)));
@@ -127,11 +166,11 @@ public final class UiCheck {
         w.logic().junkHp = 4;
         w.tapButton("FIGHT");
         w.advance(0.5555f);
-        w.tapLogical(180, 384);
-        w.tapLogical(180, 400);
+        w.tapLogical(400, 384);
+        w.tapLogical(400, 400);
         eq("ХП Джанкила 0 — победа", BattleLogic.Phase.WON, w.logic().phase);
         check("победа — конец", w.logic().isOver());
-        w.tapLogical(180, 300);
+        w.tapLogical(400, 300);
         eq("тап после конца — новая игра", BattleLogic.Phase.MENU, w.logic().phase);
         eq("новая игра: ход 1", 1, w.logic().turn);
 
@@ -145,8 +184,8 @@ public final class UiCheck {
         l.logic().playerHp = 2;
         l.tapButton("FIGHT");
         l.advance(0.5555f);
-        l.tapLogical(180, 384);
-        l.tapLogical(180, 400);
+        l.tapLogical(400, 384);
+        l.tapLogical(400, 400);
         l.advance(12f);
         eq("HP игрока 0 — поражение", BattleLogic.Phase.LOST, l.logic().phase);
     }

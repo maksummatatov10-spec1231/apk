@@ -47,6 +47,20 @@ final class Env {
         tapLogical(c[0], c[1]);
     }
 
+    /** Тянем джойстик от точки from к точке to (логические координаты), затем отпускаем. */
+    void joyDrag(float fx, float fy, float tx, float ty) {
+        view.onTouchEvent(MotionEvent.obtain(MotionEvent.ACTION_DOWN, pxX(fx), pxY(fy)));
+        view.onTouchEvent(MotionEvent.obtain(MotionEvent.ACTION_MOVE, pxX(tx), pxY(ty)));
+        advance(0.1f);
+    }
+
+    void joyRelease() {
+        view.onTouchEvent(MotionEvent.obtain(MotionEvent.ACTION_UP, 0, 0));
+        advance(0.05f);
+    }
+
+    void tapZ() { tapLogical(BattleView.Z_X, BattleView.Z_Y); }
+
     void advance(float seconds) {
         float step = 1f / 60f;
         for (float t = 0; t < seconds; t += step) view.tick(step);

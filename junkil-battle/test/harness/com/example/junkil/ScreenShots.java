@@ -47,14 +47,14 @@ public final class ScreenShots {
         Env hit = new Env(106);
         hit.tapButton("FIGHT");
         hit.advance(0.5555f);
-        hit.tapLogical(180, 384);
+        hit.tapLogical(400, 384);
         save(hit.shot(), dir, "06-fight-hit.png");
 
         Env arena = new Env(107);
         arena.tapButton("FIGHT");
         arena.advance(0.5555f);
-        arena.tapLogical(180, 384);
-        arena.tapLogical(180, 400);
+        arena.tapLogical(400, 384);
+        arena.tapLogical(400, 400);
         arena.advance(3.2f);
         save(arena.shot(), dir, "07-arena.png");
 
@@ -62,8 +62,8 @@ public final class ScreenShots {
         won.logic().junkHp = 4;
         won.tapButton("FIGHT");
         won.advance(0.5555f);
-        won.tapLogical(180, 384);
-        won.tapLogical(180, 400);
+        won.tapLogical(400, 384);
+        won.tapLogical(400, 400);
         save(won.shot(), dir, "08-won.png");
 
         Env spared = new Env(109);
@@ -75,8 +75,8 @@ public final class ScreenShots {
         lost.logic().playerHp = 2;
         lost.tapButton("FIGHT");
         lost.advance(0.5555f);
-        lost.tapLogical(180, 384);
-        lost.tapLogical(180, 400);
+        lost.tapLogical(400, 384);
+        lost.tapLogical(400, 400);
         lost.advance(12f);
         save(lost.shot(), dir, "10-lost.png");
     }

@@ -18,8 +18,14 @@ import java.util.Random;
 
 /**
  * Экран боя с Джанклимом, ЛАНДШАФТ. Логические координаты 854×480 (масштаб под экран).
- * Сверху — сцена с сеткой помойки и спрайт; внизу — белая рамка (диалог / арена) и оранжевые кнопки,
- * как в Undertale. Слева — джойстик, справа — Z / X / C.
+ *
+ * Управление как в Undertale:
+ *  - левый джойстик: в меню влево/вправо — выбор FIGHT / ACT / ITEM / MERCY, вверх/вниз — пункты подменю;
+ *    на арене — движение сердца;
+ *  - Z — подтвердить выбор (в бою — остановить полоску, в тексте — дальше);
+ *  - X — назад из подменю;
+ *  - C — показать состояние.
+ * Выбор отмечается красным сердцем у пункта. Тап по пункту тоже работает.
  */
 final class BattleView extends View {
 
@@ -31,11 +37,12 @@ final class BattleView extends View {
     // Внутреннее поле арены (ArenaSim.W × ArenaSim.H)
     static final float AX = 195f, AY = 222f;
 
-    static final float JOY_X = 100f, JOY_Y = 330f, JOY_R = 52f;
+    // Джойстик слева (крупный) и кнопки Z / X / C справа
+    static final float JOY_X = 95f, JOY_Y = 318f, JOY_R = 80f;
     static final float BTN_Y = 436f, BTN_W = 170f, BTN_H = 40f;
     static final float[] BTN_X = {47f, 237f, 427f, 617f};
-    static final float ZX_R = 30f;
-    static final float Z_X = 800f, Z_Y = 334f, X_X = 738f, X_Y = 268f, C_X = 800f, C_Y = 200f;
+    static final float ZX_R = 38f;
+    static final float Z_X = 805f, Z_Y = 370f, X_X = 735f, X_Y = 272f, C_X = 805f, C_Y = 172f;
 
     static final int BG = 0xFF0C0A16;
     static final int BORDER = 0xFFFFFFFF;
@@ -60,10 +67,12 @@ final class BattleView extends View {
     BattleLogic logic;
     ArenaSim sim;
     private String sub = SUB_NONE;
+    private int cursor;                        // выбранный пункт меню / подменю
     private float s = 1f, ox, oy;
     private float fightT, fightMarker;
     private float shake, flash;
-    private boolean joyActive;
+    private float joyX, joyY;                  // отклонение джойстика, -1..1
+    private boolean joyActive, joyStepped;
     private int lastAccuracyPct = -1;
 
     BattleView(Context context, Bitmap[] sprites, Bitmap[] textures, long seed) {
@@ -86,7 +95,7 @@ final class BattleView extends View {
         return l;
     }
 
-    /** Кнопка: id — действие касания; l/t/r/b — логические координаты. */
+    /** Пункт меню: id — действие; l/t/r/b — логические координаты (зона нажатия). */
     private static final class Btn {
         final String id, label, hint;
         final float l, t, r, b;
@@ -104,40 +113,85 @@ final class BattleView extends View {
         }
 
         boolean hit(float x, float y) {
-            return enabled && x >= l && x <= r && y >= t && y <= b;
+            return x >= l && x <= r && y >= t && y <= b;
         }
     }
 
-    private static Btn slot(String id, String label, int slot, boolean enabled) {
+    /** Главная строка: четыре оранжевые кнопки внизу. */
+    private static Btn mainSlot(String id, String label, int slot) {
         float l = BTN_X[slot];
-        return new Btn(id, label, null, l, BTN_Y, l + BTN_W, BTN_Y + BTN_H, enabled);
+        return new Btn(id, label, null, l, BTN_Y, l + BTN_W, BTN_Y + BTN_H, true);
     }
 
+    /** Строка списка в белой рамке (подменю): курсор — красное сердце слева. */
+    private static Btn listLine(String id, String label, String hint, int i, float baseY, float step, boolean enabled) {
+        float y = baseY + i * step;
+        return new Btn(id, label, hint, 207, y - 15, 647, y + 15, enabled);
+    }
+
+    private static final float MENU_LINE_Y = 270f, MENU_LINE_STEP = 36f;
+    private static final float MORSE_LINE_Y = 300f, MORSE_LINE_STEP = 32f;
+
+    /** Пункты текущего экрана (в порядке курсора). */
     private List<Btn> buttons() {
         List<Btn> bs = new ArrayList<>();
         if (logic.phase == BattleLogic.Phase.MENU) {
             if (SUB_ACT.equals(sub)) {
-                bs.add(slot("LOOK", Phrases.ACT_LOOK, 0, true));
-                bs.add(slot("MORSE", Phrases.ACT_MORSE, 1, true));
-                bs.add(slot("HAGGLE", Phrases.ACT_HAGGLE, 2, true));
-                bs.add(slot("BACK", Phrases.BACK, 3, true));
+                bs.add(listLine("LOOK", Phrases.ACT_LOOK, null, 0, MENU_LINE_Y, MENU_LINE_STEP, true));
+                bs.add(listLine("MORSE", Phrases.ACT_MORSE, null, 1, MENU_LINE_Y, MENU_LINE_STEP, true));
+                bs.add(listLine("HAGGLE", Phrases.ACT_HAGGLE, null, 2, MENU_LINE_Y, MENU_LINE_STEP, true));
+                bs.add(listLine("BACK", Phrases.BACK, null, 3, MENU_LINE_Y, MENU_LINE_STEP, true));
             } else if (SUB_ITEM.equals(sub)) {
-                bs.add(slot("BATTERY", Phrases.ITEM_BATTERY + " ×" + logic.batteries, 0, logic.batteries > 0));
-                bs.add(slot("BACK", Phrases.BACK, 3, true));
+                bs.add(listLine("BATTERY", Phrases.ITEM_BATTERY + " ×" + logic.batteries, null, 0,
+                        MENU_LINE_Y, MENU_LINE_STEP, logic.batteries > 0));
+                bs.add(listLine("BACK", Phrases.BACK, null, 1, MENU_LINE_Y, MENU_LINE_STEP, true));
             } else {
-                bs.add(slot("FIGHT", Phrases.BTN_FIGHT, 0, true));
-                bs.add(slot("ACT", Phrases.BTN_ACT, 1, true));
-                bs.add(slot("ITEM", Phrases.BTN_ITEM, 2, true));
-                bs.add(slot("MERCY", Phrases.BTN_MERCY, 3, true));
+                bs.add(mainSlot("FIGHT", Phrases.BTN_FIGHT, 0));
+                bs.add(mainSlot("ACT", Phrases.BTN_ACT, 1));
+                bs.add(mainSlot("ITEM", Phrases.BTN_ITEM, 2));
+                bs.add(mainSlot("MERCY", Phrases.BTN_MERCY, 3));
             }
         } else if (logic.phase == BattleLogic.Phase.MORSE) {
             for (int i = 0; i < 3; i++) {
-                float l = BTN_X[i];
-                String code = MorseCode.encode(logic.morseOptions[i]);
-                bs.add(new Btn("OPT" + i, logic.morseOptions[i], code, l, BTN_Y, l + BTN_W, BTN_Y + BTN_H, true));
+                bs.add(listLine("OPT" + i, logic.morseOptions[i], MorseCode.encode(logic.morseOptions[i]), i,
+                        MORSE_LINE_Y, MORSE_LINE_STEP, true));
             }
         }
         return bs;
+    }
+
+    /** Пункты показываются списком в рамке (подменю, морзе), а не кнопками внизу. */
+    private boolean isListMode() {
+        return logic.phase == BattleLogic.Phase.MORSE
+                || (logic.phase == BattleLogic.Phase.MENU && !SUB_NONE.equals(sub));
+    }
+
+    private void setSub(String next) {
+        sub = next;
+        cursor = 0;
+    }
+
+    /** Сдвиг курсора: по горизонтали — между главными кнопками, по вертикали — по списку. */
+    private void moveCursor(int dx, int dy) {
+        List<Btn> bs = buttons();
+        if (bs.isEmpty()) return;
+        if (isListMode()) {
+            cursor = clampInt(cursor + dy, 0, bs.size() - 1);
+        } else {
+            cursor = clampInt(cursor + dx, 0, bs.size() - 1);
+        }
+    }
+
+    private static int clampInt(int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    }
+
+    /** Подтвердить пункт под курсором (Z или тап). */
+    private void activateCursor() {
+        List<Btn> bs = buttons();
+        if (bs.isEmpty()) return;
+        Btn b = bs.get(clampInt(cursor, 0, bs.size() - 1));
+        if (b.enabled) handle(b.id);
     }
 
     // ---------- рисование: хелперы в логических координатах ----------
@@ -152,7 +206,7 @@ final class BattleView extends View {
         c.drawRect(X(l), Y(t), X(r), Y(b), paint);
     }
 
-    /** Рамка: белый контур толщиной w, внутри заливка fill. */
+    /** Рамка: контур толщиной w, внутри заливка fill. */
     private void frame(Canvas c, float l, float t, float r, float b, int border, int fill, float w) {
         rect(c, l - w, t - w, r + w, b + w, border);
         rect(c, l, t, r, b, fill);
@@ -173,7 +227,7 @@ final class BattleView extends View {
         c.drawCircle(X(cx), Y(cy), r * s, paint);
     }
 
-    /** Многоугольник в логических координатах, опционально с текстурой. */
+    /** Многоугольник в логических координатах, с текстурой или сплошным цветом. */
     private void poly(Canvas c, float[] pts, int tex, int color) {
         Path p = new Path();
         for (int i = 0; i < pts.length; i += 2) {
@@ -191,8 +245,8 @@ final class BattleView extends View {
         paint.setShader(null);
     }
 
-    /** Фигура из ArenaSim в позиции (cx, cy) с радиусом r и поворотом rot (логические координаты поля). */
-    private void drawShape(Canvas c, float[] base, float cx, float cy, float r, float rot, int tex) {
+    /** Фигура в позиции (cx, cy) с радиусом r и поворотом rot. */
+    private void drawShape(Canvas c, float[] base, float cx, float cy, float r, float rot, int tex, int color) {
         float cs = (float) Math.cos(rot), sn = (float) Math.sin(rot);
         float[] pts = new float[base.length];
         for (int i = 0; i < base.length; i += 2) {
@@ -200,7 +254,7 @@ final class BattleView extends View {
             pts[i] = cx + x * cs - y * sn;
             pts[i + 1] = cy + x * sn + y * cs;
         }
-        poly(c, pts, tex, RED);
+        poly(c, pts, tex, color);
     }
 
     private static final float[] HEART_SHAPE = heartShape();
@@ -215,6 +269,11 @@ final class BattleView extends View {
             out[2 * i + 1] = (float) (-y / 17.0);
         }
         return out;
+    }
+
+    /** Красное сердце-курсор в логических координатах (радиус ≈ 8). */
+    private void heart(Canvas c, float x, float y, float r) {
+        drawShape(c, HEART_SHAPE, x, y, r, 0f, -1, RED);
     }
 
     /** Перенос текста по ширине (логические единицы). */
@@ -261,7 +320,7 @@ final class BattleView extends View {
         }
         drawPlayer(c);
         if (!arena) drawButtons(c);
-        drawControls(c, arena);
+        drawControls(c);
         if (flash > 0) {
             rect(c, 0, 0, LW, 4, RED);
             rect(c, 0, LH - 4, LW, LH, RED);
@@ -328,9 +387,8 @@ final class BattleView extends View {
             return;
         }
         if (ph == BattleLogic.Phase.MORSE) {
-            text(c, Phrases.MORSE_TITLE, 207, 246, 18, YELLOW, true, false);
-            drawSignal(c, logic.morseWord, 207, 272);
-            text(c, "выбери слово, которое передано", 207, 330, 14, DIM, false, false);
+            text(c, Phrases.MORSE_TITLE, 207, 240, 16, YELLOW, true, false);
+            drawSignal(c, logic.morseWord, 207, 252);
             return;
         }
         if (ph == BattleLogic.Phase.WON || ph == BattleLogic.Phase.SPARED || ph == BattleLogic.Phase.LOST) {
@@ -339,6 +397,15 @@ final class BattleView extends View {
             text(c, head, 207, 246, 20, YELLOW, true, false);
             drawWrapped(c, logic.line, 207, 280, 17);
             text(c, Phrases.TAP_RESTART, 427, 384, 13, DIM, false, true);
+            return;
+        }
+        if (ph == BattleLogic.Phase.MENU && !SUB_NONE.equals(sub)) {
+            // подменю: реплика Джанкила сверху, пункты ниже (отрисовываются в drawButtons)
+            drawWrapped(c, logic.line, 207, 240, 16);
+            return;
+        }
+        if (ph == BattleLogic.Phase.MENU) {
+            drawWrapped(c, logic.line, 207, 246, 18);
             return;
         }
         drawWrapped(c, logic.line, 207, 246, 18);
@@ -377,11 +444,11 @@ final class BattleView extends View {
                     rect(c, px - 6, py - 2, px + 6, py + 2, TEXT);
                     break;
                 default:
-                    drawShape(c, ArenaSim.polygon(it.kind), px, py, it.r, it.rot, it.tex);
+                    drawShape(c, ArenaSim.polygon(it.kind), px, py, it.r, it.rot, it.tex, RED);
                     break;
             }
         }
-        drawShape(c, HEART_SHAPE, AX + sim.heartX, AY + sim.heartY, 13f, 0f, -1);   // сердце
+        heart(c, AX + sim.heartX, AY + sim.heartY, 13f);
     }
 
     private void drawPlayer(Canvas c) {
@@ -394,41 +461,50 @@ final class BattleView extends View {
         text(c, "батарейки ×" + logic.batteries, 560, 428, 14, DIM, false, false);
     }
 
+    /** Меню: главная строка кнопок, либо список в рамке; сердце — у выбранного пункта. */
     private void drawButtons(Canvas c) {
         if (logic.phase == BattleLogic.Phase.FIGHT || logic.isOver() || logic.phase == BattleLogic.Phase.JUNK_TALK) {
             return;
         }
-        for (Btn b : buttons()) {
-            int fill = 0xFF000000;
-            int border = b.enabled ? ORANGE : GREY;
-            int textCol = b.enabled ? ORANGE : ORANGE_DIM;
-            frame(c, b.l, b.t, b.r, b.b, border, fill, 2);
-            if (b.hint != null) {
-                text(c, b.label, (b.l + b.r) / 2f, b.t + 18, 15, textCol, true, true);
-                text(c, b.hint, (b.l + b.r) / 2f, b.t + 34, 11, DIM, false, true);
+        if (logic.phase != BattleLogic.Phase.MENU && logic.phase != BattleLogic.Phase.MORSE) return;
+        List<Btn> bs = buttons();
+        boolean list = isListMode();
+        for (int i = 0; i < bs.size(); i++) {
+            Btn b = bs.get(i);
+            boolean focused = i == clampInt(cursor, 0, bs.size() - 1);
+            if (list) {
+                int col = b.enabled ? TEXT : GREY;
+                if (focused) heart(c, b.l + 14, (b.t + b.b) / 2f, 9f);
+                text(c, b.label, b.l + 34, (b.t + b.b) / 2f + 7, 20, focused ? YELLOW : col, focused, false);
+                if (b.hint != null) {
+                    text(c, b.hint, b.r - 8, (b.t + b.b) / 2f + 6, 14, DIM, false, false);
+                    paint.setShader(null);
+                }
             } else {
-                text(c, b.label, (b.l + b.r) / 2f, b.t + 26, 16, textCol, true, true);
+                int border = focused ? YELLOW : ORANGE;
+                frame(c, b.l, b.t, b.r, b.b, border, 0xFF000000, 2);
+                text(c, b.label, (b.l + b.r) / 2f + 8, b.t + 26, 16, focused ? YELLOW : ORANGE, true, true);
+                if (focused) heart(c, b.l + 16, b.t + 20, 9f);
             }
         }
     }
 
-    /** Джойстик (слева) и кнопки Z / X / C (справа) — как на экранном управлении. */
-    private void drawControls(Canvas c, boolean arena) {
-        circle(c, JOY_X, JOY_Y, JOY_R + 3, 0xFF555555);
+    /** Джойстик (слева, крупный) и кнопки Z / X / C (справа). */
+    private void drawControls(Canvas c) {
+        circle(c, JOY_X, JOY_Y, JOY_R + 4, 0xFF555555);
         circle(c, JOY_X, JOY_Y, JOY_R, 0xFF161616);
-        float kx = JOY_X + (arena ? sim.stickX : 0f) * (JOY_R - 12);
-        float ky = JOY_Y + (arena ? sim.stickY : 0f) * (JOY_R - 12);
-        circle(c, kx, ky, 12, 0xFF8A8A8A);
-        circle(c, kx, ky, 8, 0xFF2B2B2B);
+        float kx = JOY_X + joyX * (JOY_R - 22), ky = JOY_Y + joyY * (JOY_R - 22);
+        circle(c, kx, ky, 22, 0xFF8A8A8A);
+        circle(c, kx, ky, 15, 0xFF2B2B2B);
         drawKey(c, C_X, C_Y, "C");
         drawKey(c, X_X, X_Y, "X");
         drawKey(c, Z_X, Z_Y, "Z");
     }
 
     private void drawKey(Canvas c, float x, float y, String label) {
-        circle(c, x, y, ZX_R + 2, 0xFF666666);
+        circle(c, x, y, ZX_R + 3, 0xFF666666);
         circle(c, x, y, ZX_R, 0xFF1A1A1A);
-        text(c, label, x, y + 7, 20, 0xFFAAAAAA, true, true);
+        text(c, label, x, y + 8, 24, 0xFFAAAAAA, true, true);
     }
 
     // ---------- вход и такт ----------
@@ -442,11 +518,14 @@ final class BattleView extends View {
                 onDown(lx, ly);
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if (joyActive && sim != null) setStickFrom(lx, ly);
+                if (joyActive) setStickFrom(lx, ly);
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 joyActive = false;
+                joyX = 0f;
+                joyY = 0f;
+                joyStepped = false;
                 if (sim != null) sim.setStick(0f, 0f);
                 return true;
             default:
@@ -464,49 +543,50 @@ final class BattleView extends View {
             restart();
             return;
         }
-        if (near(lx, ly, Z_X, Z_Y, ZX_R + 6)) { pressZ(); return; }
-        if (near(lx, ly, X_X, X_Y, ZX_R + 6)) { pressX(); return; }
-        if (near(lx, ly, C_X, C_Y, ZX_R + 6)) { pressC(); return; }
-        if (logic.phase == BattleLogic.Phase.ARENA && sim != null && near(lx, ly, JOY_X, JOY_Y, JOY_R + 30)) {
+        if (near(lx, ly, Z_X, Z_Y, ZX_R + 8)) { pressZ(); return; }
+        if (near(lx, ly, X_X, X_Y, ZX_R + 8)) { pressX(); return; }
+        if (near(lx, ly, C_X, C_Y, ZX_R + 8)) { pressC(); return; }
+        if (near(lx, ly, JOY_X, JOY_Y, JOY_R + 30)) {
             joyActive = true;
             setStickFrom(lx, ly);
             return;
         }
-        switch (logic.phase) {
-            case FIGHT:
-                stopFight();
-                return;
-            case JUNK_TALK:
-                continueTalk();
-                return;
-            case ARENA:
-                return;
-            default:
-                break;
+        if (logic.phase == BattleLogic.Phase.FIGHT) {
+            stopFight();
+            return;
         }
-        for (Btn b : buttons()) {
-            if (b.hit(lx, ly)) {
-                handle(b.id);
+        if (logic.phase == BattleLogic.Phase.JUNK_TALK) {
+            continueTalk();
+            return;
+        }
+        if (logic.phase == BattleLogic.Phase.ARENA) return;
+        List<Btn> bs = buttons();
+        for (int i = 0; i < bs.size(); i++) {
+            if (bs.get(i).hit(lx, ly)) {
+                cursor = i;
+                if (bs.get(i).enabled) handle(bs.get(i).id);
                 return;
             }
         }
     }
 
-    /** Z: подтвердить — остановить полоску, продолжить текст, начать заново. */
+    /** Z: подтвердить — выбор пункта, остановить полоску, продолжить текст, начать заново. */
     private void pressZ() {
         switch (logic.phase) {
             case FIGHT: stopFight(); break;
             case JUNK_TALK: continueTalk(); break;
+            case MENU:
+            case MORSE: activateCursor(); break;
             default: break;
         }
     }
 
     /** X: назад из подменю. */
     private void pressX() {
-        sub = SUB_NONE;
+        if (logic.phase == BattleLogic.Phase.MENU && !SUB_NONE.equals(sub)) setSub(SUB_NONE);
     }
 
-    /** C: показать состояние в диалоге (без изменения боя). */
+    /** C: показать состояние в реплике (без изменения боя). */
     private void pressC() {
         if (logic.phase != BattleLogic.Phase.MENU) return;
         logic.line = "ТЫ: HP " + logic.playerHp + "/" + BattleLogic.PLAYER_MAX
@@ -515,12 +595,31 @@ final class BattleView extends View {
     }
 
     private void setStickFrom(float lx, float ly) {
-        float dx = (lx - JOY_X) / (JOY_R - 6), dy = (ly - JOY_Y) / (JOY_R - 6);
-        sim.setStick(clamp(dx), clamp(dy));
+        joyX = clamp((lx - JOY_X) / (JOY_R - 10));
+        joyY = clamp((ly - JOY_Y) / (JOY_R - 10));
     }
 
     private static float clamp(float v) {
         return v < -1 ? -1 : (v > 1 ? 1 : v);
+    }
+
+    /**
+     * Джойстик в меню: один шаг на отклонение (как стрелки в Undertale).
+     * Повтор возможен только после возврата в центр.
+     */
+    private void stepMenuFromJoystick() {
+        float mag = (float) Math.sqrt(joyX * joyX + joyY * joyY);
+        if (mag < 0.35f) {
+            joyStepped = false;
+            return;
+        }
+        if (mag < 0.6f || joyStepped) return;
+        joyStepped = true;
+        if (Math.abs(joyX) >= Math.abs(joyY)) {
+            moveCursor(joyX > 0 ? 1 : -1, 0);
+        } else {
+            moveCursor(0, joyY > 0 ? 1 : -1);
+        }
     }
 
     private void handle(String id) {
@@ -528,40 +627,41 @@ final class BattleView extends View {
             case "FIGHT":
                 logic.chooseFight();
                 fightT = 0f;
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "ACT":
-                sub = SUB_ACT;
+                setSub(SUB_ACT);
                 break;
             case "ITEM":
-                sub = SUB_ITEM;
+                setSub(SUB_ITEM);
                 break;
             case "BACK":
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "MERCY":
                 logic.mercy();
                 break;
             case "LOOK":
                 logic.chooseAct(BattleLogic.Act.LOOK);
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "MORSE":
                 logic.chooseAct(BattleLogic.Act.MORSE);
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "HAGGLE":
                 logic.chooseAct(BattleLogic.Act.HAGGLE);
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "BATTERY":
                 logic.useBattery();
-                sub = SUB_NONE;
+                setSub(SUB_NONE);
                 break;
             case "OPT0":
             case "OPT1":
             case "OPT2":
                 logic.answerMorse(id.charAt(3) - '0');
+                cursor = 0;
                 break;
             default:
                 break;
@@ -583,9 +683,11 @@ final class BattleView extends View {
 
     private void restart() {
         logic = newLogic();
-        sub = SUB_NONE;
+        setSub(SUB_NONE);
         sim = null;
         joyActive = false;
+        joyX = 0f;
+        joyY = 0f;
     }
 
     /** Шаг времени (вызывается из MainActivity ~60 раз в секунду, в тестах — вручную). */
@@ -598,19 +700,26 @@ final class BattleView extends View {
         if (shake > 0) shake = Math.max(0, shake - dt);
         if (flash > 0) flash = Math.max(0, flash - dt);
         if (logic.phase == BattleLogic.Phase.ARENA && sim != null) {
+            sim.setStick(joyX, joyY);
             int newHits = sim.update(dt);
             if (newHits > 0) flash = 0.15f;
             if (sim.finished()) {
                 logic.endArena(sim.hits);
                 sim = null;
                 joyActive = false;
+                joyX = 0f;
+                joyY = 0f;
             }
+        } else if (logic.phase == BattleLogic.Phase.MENU || logic.phase == BattleLogic.Phase.MORSE) {
+            stepMenuFromJoystick();
         }
     }
 
     // ---------- для тестов ----------
 
     String subForTest() { return sub; }
+
+    int cursorForTest() { return cursor; }
 
     int lastAccuracyPctForTest() { return lastAccuracyPct; }
 
@@ -620,7 +729,7 @@ final class BattleView extends View {
         return ids;
     }
 
-    /** Центр кнопки в логических координатах (для тестов касаний). */
+    /** Центр пункта в логических координатах (для тестов касаний). */
     float[] buttonCenterForTest(String id) {
         for (Btn b : buttons()) {
             if (b.id.equals(id)) return new float[] {(b.l + b.r) / 2f, (b.t + b.b) / 2f};
@@ -636,6 +745,7 @@ final class BattleView extends View {
     void setFightMarkerForTest(float m) { fightMarker = m; }
 
     void setStickForTest(float dx, float dy) {
-        if (sim != null) sim.setStick(dx, dy);
+        joyX = dx;
+        joyY = dy;
     }
 }
