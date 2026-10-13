@@ -73,34 +73,39 @@ PITCH = 72     # выше обычного: тонкий голос
 RATE = 158     # слова в минуту
 
 
-def synth(text):
-    lib = ctypes.CDLL(el.get_library_path())
-    data = el.get_data_path().encode()
-    # Инициализация в порядке, при котором находится голос ru (см. README: espeak_ng_Initialize).
-    lib.espeak_ng_InitializePath(data)
-    lib.espeak_ng_Initialize(None)
-    if lib.espeak_ng_SetVoiceByName(b"ru") != 0:
-        raise SystemExit("голос ru не найден")
-    lib.espeak_ng_InitializeOutput(1, 200, None)
-    lib.espeak_ng_SetVoiceByName(b"ru")
-    lib.espeak_ng_SetParameter(1, RATE, 0)
-    lib.espeak_ng_SetParameter(3, PITCH, 0)
-    out = array.array("h")
-    cb_type = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_short), ctypes.c_int, ctypes.c_void_p)
+class Speaker:
+    """Один сеанс eSpeak NG на все фразы (повторная инициализация портит голос)."""
 
-    def cb(wav, n, events):
-        if n > 0:
-            out.extend(wav[:n])
-        return 0
+    def __init__(self):
+        self.lib = ctypes.CDLL(el.get_library_path())
+        # Порядок важен: InitializePath (ошибка -21 ожидаема), затем Initialize, голос, вывод.
+        self.lib.espeak_ng_InitializePath(el.get_data_path().encode())
+        self.lib.espeak_ng_Initialize(None)
+        if self.lib.espeak_ng_SetVoiceByName(b"ru") != 0:
+            raise SystemExit("голос ru не найден")
+        self.lib.espeak_ng_InitializeOutput(1, 200, None)
+        self.lib.espeak_ng_SetVoiceByName(b"ru")
+        self.lib.espeak_ng_SetParameter(1, RATE, 0)
+        self.lib.espeak_ng_SetParameter(3, PITCH, 0)
+        self.buf = array.array("h")
+        self.cb_type = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_short),
+                                        ctypes.c_int, ctypes.c_void_p)
 
-    holder = cb_type(cb)  # удерживаем ссылку, иначе callback соберут
-    lib.espeak_SetSynthCallback(holder)
-    raw = text.encode("utf-8")
-    if lib.espeak_ng_Synthesize(raw, len(raw) + 1, 0, 0, 0, 1, None, None) != 0:
-        raise SystemExit("синтез не удался: " + text)
-    lib.espeak_ng_Synchronize()
-    lib.espeak_ng_Terminate()
-    return [float(s) / 32768.0 for s in out]
+        def cb(wav, n, events):
+            if n > 0:
+                self.buf.extend(wav[:n])
+            return 0
+
+        self.holder = self.cb_type(cb)  # удерживаем ссылку на callback
+        self.lib.espeak_SetSynthCallback(self.holder)
+
+    def say(self, text):
+        self.buf = array.array("h")
+        raw = text.encode("utf-8")
+        if self.lib.espeak_ng_Synthesize(raw, len(raw) + 1, 0, 0, 0, 1, None, None) != 0:
+            raise SystemExit("синтез не удался: " + text)
+        self.lib.espeak_ng_Synchronize()
+        return [float(v) / 32768.0 for v in self.buf]
 
 
 def normalize(x, peak=0.85):
@@ -109,19 +114,24 @@ def normalize(x, peak=0.85):
     return [v * g for v in x]
 
 
-def spamton_color(x):
-    """Лёгкая «пластиковая» окраска: сжатие и мягкий клип."""
-    out = []
-    for v in x:
-        out.append(_tanh(v * 1.6) * 0.8)
-    return out
-
-
-def _tanh(v):
-    if v > 3: return 1.0
-    if v < -3: return -1.0
-    e = pow(2.718281828, 2 * v)
-    return (e - 1) / (e + 1)
+def smooth(x, cutoff=4200.0):
+    """Сглаживание: три каскада однополюсного фильтра низких частот + плавные края.
+    Убирает резкость и «металлический» щелчок между фонемами; без клиппинга."""
+    import math
+    a = 1 - math.exp(-2 * math.pi * cutoff / SR)
+    y = list(x)
+    for _ in range(3):
+        acc = 0.0
+        for i, v in enumerate(y):
+            acc += a * (v - acc)
+            y[i] = acc
+    fade = int(SR * 0.012)
+    n = len(y)
+    for i in range(min(fade, n)):
+        g = i / fade
+        y[i] *= g
+        y[n - 1 - i] *= g
+    return y
 
 
 def glitch(x, rnd):
@@ -174,12 +184,13 @@ def main():
     args = ap.parse_args()
 
     entries = []
+    speaker = Speaker()
     for idx, (pid, shown, speech, glitch_on) in enumerate(PHRASES):
-        x = synth(speech)
+        x = speaker.say(speech)
         if not x:
             raise SystemExit("пустой синтез: " + pid)
         x = normalize(x)
-        x = spamton_color(x)
+        x = smooth(x)
         if glitch_on:
             x = glitch(x, random.Random(1000 + idx))
         x = normalize(x, 0.8)

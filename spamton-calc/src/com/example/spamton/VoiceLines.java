@@ -1,6 +1,6 @@
 package com.example.spamton;
 
-/** СГЕНЕРИРОВАНО tools/gen_voice.py. Не править вручную. */
+/** СГЕНЕРИРОВАНО scripts/gen_voice.py. Не править вручную. */
 final class VoiceLines {
 
     private VoiceLines() {}
