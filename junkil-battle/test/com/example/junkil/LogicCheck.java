@@ -128,7 +128,8 @@ public final class LogicCheck {
         b.chooseFight();
         b.fight(0.5);
         check("старт арены", b.startArena() != null);
-        b.endArena(10);
+        for (int i = 0; i < 10; i++) b.arenaHit();
+        b.endArena();
         eq("20 ХП минус 10 попаданий по 2 = 0 → LOST", BattleLogic.Phase.LOST, b.phase);
         check("LOST — конец", b.isOver());
     }
@@ -138,18 +139,39 @@ public final class LogicCheck {
         b.chooseFight();
         b.fight(0.5);
         b.startArena();
-        b.endArena(3);
-        eq("3 попадания по 2 урона", 14, b.playerHp);
+        for (int i = 0; i < 3; i++) b.arenaHit();
+        eq("3 попадания по 2 урона сразу, до конца арены", 14, b.playerHp);
+        b.endArena();
         eq("после арены новый ход", 2, b.turn);
         eq("после арены фаза MENU", BattleLogic.Phase.MENU, b.phase);
 
-        ArenaSim normal = new ArenaSim(new Random(42), BattleLogic.Pattern.NORMAL, "SOS");
-        ArenaSim reduced = new ArenaSim(new Random(42), BattleLogic.Pattern.REDUCED, "SOS");
-        ArenaSim boosted = new ArenaSim(new Random(42), BattleLogic.Pattern.BOOSTED, "SOS");
-        int nAll = run(normal), rAll = run(reduced), bAll = run(boosted);
+        int nAll = 0, rAll = 0, bAll = 0;
+        for (long seed = 1; seed <= 10; seed++) {
+            nAll += run(new ArenaSim(new Random(seed), BattleLogic.Pattern.NORMAL, "SOS"));
+            rAll += run(new ArenaSim(new Random(seed), BattleLogic.Pattern.REDUCED, "SOS"));
+            bAll += run(new ArenaSim(new Random(seed), BattleLogic.Pattern.BOOSTED, "SOS"));
+        }
         check("BOOSTED плотнее NORMAL (" + bAll + " > " + nAll + ")", bAll > nAll);
         check("REDUCED реже NORMAL (" + rAll + " < " + nAll + ")", rAll < nAll);
+        ArenaSim normal = new ArenaSim(new Random(42), BattleLogic.Pattern.NORMAL, "SOS");
+        run(normal);
         check("арена заканчивается по времени", normal.finished());
+
+        // Разнообразие: во всех ходах МОРЗЕ первое, а типы атак разные
+        java.util.Set<ArenaSim.Attack> seen = new HashSet<>();
+        for (long seed = 1; seed <= 12; seed++) {
+            ArenaSim s = new ArenaSim(new Random(seed), BattleLogic.Pattern.NORMAL, "JUNK");
+            run(s);
+            eq("ЧАСТОТА (МОРЗЕ) всегда первая, seed " + seed, ArenaSim.Attack.MORSE, s.attackLog.get(0));
+            check("в ходе три атаки, seed " + seed, s.attackLog.size() >= 2);
+            seen.addAll(s.attackLog);
+        }
+        check("атаки разнообразны: видов не меньше 4 (" + seen + ")", seen.size() >= 4);
+
+        // Прицел: направление от точки старта к сердцу
+        float[] v = ArenaSim.aim(0f, 0f, 100f, 0f, 50f);
+        eq("прицел вправо: vx", 50f, v[0]);
+        eq("прицел вправо: vy", 0f, v[1]);
 
         ArenaSim sim = new ArenaSim(new Random(1), BattleLogic.Pattern.NORMAL, "SOS");
         sim.moveHeartTo(-500, 500);

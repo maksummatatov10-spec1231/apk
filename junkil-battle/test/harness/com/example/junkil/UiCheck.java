@@ -80,6 +80,8 @@ public final class UiCheck {
         eq("вниз в подменю: курсор 1 (СИГНАЛ)", 1, e.view.cursorForTest());
         e.tapZ();
         eq("Z на СИГНАЛе переводит в MORSE", BattleLogic.Phase.MORSE, e.logic().phase);
+        check("морзе-тоны для слова играют при входе в сигнал",
+                e.sounds.count("morse_" + e.logic().morseWord.toLowerCase()) == 1);
         e.joyDrag(BattleView.JOY_X, BattleView.JOY_Y, BattleView.JOY_X, BattleView.JOY_Y + 60);
         e.joyRelease();
         eq("в MORSE вниз: курсор 1", 1, e.view.cursorForTest());
@@ -142,6 +144,22 @@ public final class UiCheck {
         eq("арена после текста", BattleLogic.Phase.ARENA, e.logic().phase);
         e.advance(1.5f);
         check("на арене есть предметы", e.view.sim.items.size() > 0 || e.view.sim.spawned > 0);
+        check("звук атаки (whoosh) играл", e.sounds.count("whoosh") > 0);
+
+        // Урон сразу: фигура попадает в сердце — ХП игрока меняется в тот же кадр, арена не кончается
+        Env hit = new Env(33);
+        hit.tapButton("FIGHT");
+        hit.advance(0.5555f);
+        hit.tapLogical(400, 384);
+        hit.tapLogical(400, 400);
+        int hp0 = hit.logic().playerHp;
+        float hx = hit.view.sim.heartX, hy = hit.view.sim.heartY;
+        ArenaSim.Item fake = new ArenaSim.Item(ArenaSim.Kind.COIN, 0, hx, hy, 0f, 0f, 6f);
+        hit.view.sim.items.add(fake);
+        hit.advance(0.02f);
+        eq("попадание: ХП игрока уменьшилось сразу", hp0 - BattleLogic.HIT_DAMAGE, hit.logic().playerHp);
+        eq("попадание: фаза арены не закончилась", BattleLogic.Phase.ARENA, hit.logic().phase);
+        check("звук удара (hurt) играл", hit.sounds.count("hurt") > 0);
 
         // Сердце двигается по джойстику вправо
         Env j = new Env(27);

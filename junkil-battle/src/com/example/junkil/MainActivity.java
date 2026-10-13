@@ -19,6 +19,7 @@ public class MainActivity extends Activity {
     };
 
     private BattleView view;
+    private AndroidSounds sounds;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastNs;
 
@@ -41,6 +42,8 @@ public class MainActivity extends Activity {
         Bitmap[] textures = new Bitmap[TEXTURES.length];
         for (int i = 0; i < TEXTURES.length; i++) textures[i] = load(TEXTURES[i]);
         view = new BattleView(this, sprites, textures, System.currentTimeMillis());
+        sounds = new AndroidSounds(this);
+        view.setSounds(sounds);
         setContentView(view);
         hideSystemUi();
     }
@@ -74,5 +77,11 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(frame);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (sounds != null) sounds.release();
     }
 }

@@ -14,6 +14,7 @@ final class Env {
     };
 
     final BattleView view;
+    final RecSounds sounds = new RecSounds();
 
     Env(long seed) {
         Bitmap[] sprites = {new Bitmap("res/drawable-nodpi/junkil.png", 290, 440), null, null};
@@ -23,6 +24,7 @@ final class Env {
         }
         view = new BattleView(new Context(), sprites, textures, seed);
         view.layout(0, 0, W, H);
+        view.setSounds(sounds);
     }
 
     private float scale() { return Math.min(W / BattleView.LW, H / BattleView.LH); }

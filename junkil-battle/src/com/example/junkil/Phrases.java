@@ -35,6 +35,11 @@ final class Phrases {
 
     static final String ATTACK_NORMAL = "ЛОВИ ХЛАМ!! КРЫШКИ, БАТАРЕЙКИ, ПЛАТЫ!!";
     static final String ATTACK_REDUCED = "ТЫ СБИЛ МОЮ ЧАСТОТУ... ХЛАМА МЕНЬШЕ. ПОКА.";
+    static final String ATTACK_AIM = "ПРИЦЕЛ!! ДВИГАЙСЯ, ОНО ЛЕТИТ В ТЕБЯ!";
+    static final String ATTACK_WALL = "СТЕНА ХЛАМА!! ИЩИ ДЫРУ И ПРЫГАЙ В НЕЁ!";
+    static final String ATTACK_RING = "КАРУСЕЛЬ!! ВЕРТИСЬ, КРУТИСЬ, ПРОХОДИ В ЩЕЛЬ!";
+    static final String ATTACK_BOUNCE = "ОТСКОК!! ВСЁ ПРЫГАЕТ, КАК ВЕСЬ ДЖАНК!";
+    static final String ATTACK_MORSE = "ЧАСТОТА!! ЧИТАЙ СИГНАЛ: ТОЧКИ — КОЛЮЧКИ, ТИРЕ — СТЕНЫ!";
     static final String ATTACK_BOOSTED = "ТЫ ОШИБСЯ! ТЕПЕРЬ ВСЁ ПО ПОЛНОЙ ЦЕНЕ!!! ВСЁ!!";
 
     static final String INTRO = "ДЖАНКИЛ ВЫЛЕЗ ИЗ МУСОРНОГО БАКА. ЧТО ДЕЛАТЬ?";

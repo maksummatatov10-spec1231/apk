@@ -193,10 +193,15 @@ final class BattleLogic {
         return p;
     }
 
-    /** Конец арены: урон от попаданий, затем следующий ход или поражение. */
-    void endArena(int hits) {
+    /** Попадание на арене: урон игроку применяется сразу, в момент касания. */
+    void arenaHit() {
         if (phase != Phase.ARENA) throw new IllegalStateException("не фаза ARENA: " + phase);
-        playerHp = Math.max(0, playerHp - Math.max(0, hits) * HIT_DAMAGE);
+        playerHp = Math.max(0, playerHp - HIT_DAMAGE);
+    }
+
+    /** Конец арены: поражение, если HP 0, иначе следующий ход. */
+    void endArena() {
+        if (phase != Phase.ARENA) throw new IllegalStateException("не фаза ARENA: " + phase);
         if (playerHp <= 0) {
             phase = Phase.LOST;
             line = Phrases.LOST;

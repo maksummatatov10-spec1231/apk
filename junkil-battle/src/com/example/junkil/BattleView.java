@@ -34,8 +34,9 @@ final class BattleView extends View {
 
     // Рамка боя (арена и диалог)
     static final float BOX_L = 187f, BOX_T = 214f, BOX_R = 667f, BOX_B = 398f;
-    // Внутреннее поле арены (ArenaSim.W × ArenaSim.H)
-    static final float AX = 195f, AY = 222f;
+    // Арена атаки — квадрат 184×184 в центре (поле ArenaSim.W × ArenaSim.H)
+    static final float ARENA_L = 335f, ARENA_T = 214f, ARENA_R = 519f, ARENA_B = 398f;
+    static final float AX = ARENA_L, AY = ARENA_T;
 
     // Джойстик слева (крупный) и кнопки Z / X / C справа
     static final float JOY_X = 95f, JOY_Y = 318f, JOY_R = 80f;
@@ -64,6 +65,10 @@ final class BattleView extends View {
     private final Bitmap[] textures;           // бесшовные текстуры атак
     private final BitmapShader[] shaders;
     private final Random rng;
+    private Sounds sounds = new Sounds() {
+        @Override
+        public void play(String name) { }
+    };
     BattleLogic logic;
     ArenaSim sim;
     private String sub = SUB_NONE;
@@ -87,6 +92,10 @@ final class BattleView extends View {
         }
         this.rng = new Random(seed);
         this.logic = newLogic();
+    }
+
+    void setSounds(Sounds s) {
+        sounds = s;
     }
 
     private BattleLogic newLogic() {
@@ -175,11 +184,13 @@ final class BattleView extends View {
     private void moveCursor(int dx, int dy) {
         List<Btn> bs = buttons();
         if (bs.isEmpty()) return;
+        int before = cursor;
         if (isListMode()) {
             cursor = clampInt(cursor + dy, 0, bs.size() - 1);
         } else {
             cursor = clampInt(cursor + dx, 0, bs.size() - 1);
         }
+        if (cursor != before) sounds.play("select");
     }
 
     private static int clampInt(int v, int lo, int hi) {
@@ -191,7 +202,12 @@ final class BattleView extends View {
         List<Btn> bs = buttons();
         if (bs.isEmpty()) return;
         Btn b = bs.get(clampInt(cursor, 0, bs.size() - 1));
-        if (b.enabled) handle(b.id);
+        if (b.enabled) {
+            sounds.play("confirm");
+            handle(b.id);
+        } else {
+            sounds.play("back");
+        }
     }
 
     // ---------- рисование: хелперы в логических координатах ----------
@@ -433,7 +449,11 @@ final class BattleView extends View {
     }
 
     private void drawArena(Canvas c) {
-        frame(c, BOX_L, BOX_T, BOX_R, BOX_B, BORDER, 0xFF000000, 4);
+        frame(c, ARENA_L, ARENA_T, ARENA_R, ARENA_B, BORDER, 0xFF000000, 4);
+        text(c, arenaLabel(), AX + 5, AY + 13, 11, YELLOW, true, false);
+        // снаряды не выходят за квадрат арены (падающие сверху появляются из-за рамки)
+        c.save();
+        c.clipRect(ARENA_L + 4, ARENA_T + 4, ARENA_R - 4, ARENA_B - 4);
         for (ArenaSim.Item it : sim.items) {
             float px = AX + it.x, py = AY + it.y;
             switch (it.kind) {
@@ -448,7 +468,22 @@ final class BattleView extends View {
                     break;
             }
         }
-        heart(c, AX + sim.heartX, AY + sim.heartY, 13f);
+        c.restore();
+        heart(c, AX + sim.heartX, AY + sim.heartY, 11f);
+    }
+
+    /** Короткая подпись текущей атаки (что сейчас летит). */
+    private String arenaLabel() {
+        ArenaSim.Attack a = sim.currentAttack();
+        if (a == null) return "";
+        switch (a) {
+            case MORSE: return "ЧАСТОТА: ТОЧКИ-ИГЛЫ";
+            case AIM: return "ПРИЦЕЛ: ДВИГАЙСЯ";
+            case WALL: return "СТЕНА: ИЩИ ДЫРУ";
+            case RING: return "КАРУСЕЛЬ: ИЩИ ЩЕЛЬ";
+            case BOUNCE: return "ОТСКОК";
+            default: return "";
+        }
     }
 
     private void drawPlayer(Canvas c) {
@@ -639,7 +674,8 @@ final class BattleView extends View {
                 setSub(SUB_NONE);
                 break;
             case "MERCY":
-                logic.mercy();
+                if (logic.mercy()) sounds.play("mercy");
+                else sounds.play("back");
                 break;
             case "LOOK":
                 logic.chooseAct(BattleLogic.Act.LOOK);
@@ -648,19 +684,21 @@ final class BattleView extends View {
             case "MORSE":
                 logic.chooseAct(BattleLogic.Act.MORSE);
                 setSub(SUB_NONE);
+                sounds.play("morse_" + logic.morseWord.toLowerCase());
                 break;
             case "HAGGLE":
                 logic.chooseAct(BattleLogic.Act.HAGGLE);
                 setSub(SUB_NONE);
                 break;
             case "BATTERY":
-                logic.useBattery();
+                if (logic.useBattery()) sounds.play("heal");
                 setSub(SUB_NONE);
                 break;
             case "OPT0":
             case "OPT1":
             case "OPT2":
-                logic.answerMorse(id.charAt(3) - '0');
+                if (logic.answerMorse(id.charAt(3) - '0')) sounds.play("confirm");
+                else sounds.play("hit");
                 cursor = 0;
                 break;
             default:
@@ -672,13 +710,34 @@ final class BattleView extends View {
         double acc = 1.0 - Math.abs(fightMarker - 0.5) * 2.0;
         lastAccuracyPct = (int) Math.round(acc * 100);
         int dmg = logic.fight(acc);
-        if (dmg > 0) shake = 0.4f;
+        if (dmg > 0) {
+            shake = 0.4f;
+            sounds.play("hit");
+        } else {
+            sounds.play("back");
+        }
     }
 
     private void continueTalk() {
         BattleLogic.Pattern p = logic.startArena();
-        if (p == null) return;                // победа: экран конца
+        if (p == null) {                      // победа: экран конца
+            sounds.play("win");
+            return;
+        }
         sim = new ArenaSim(rng, p, logic.morseWord);
+        lastAttackStarts = 0;
+    }
+
+    private int lastAttackStarts;
+
+    /** Конец арены: поражение, если HP 0, иначе следующий ход. Сбрасывает поле и джойстик. */
+    private void endArenaNow() {
+        logic.endArena();
+        sim = null;
+        joyActive = false;
+        joyX = 0f;
+        joyY = 0f;
+        if (logic.phase == BattleLogic.Phase.LOST) sounds.play("lose");
     }
 
     private void restart() {
@@ -702,13 +761,19 @@ final class BattleView extends View {
         if (logic.phase == BattleLogic.Phase.ARENA && sim != null) {
             sim.setStick(joyX, joyY);
             int newHits = sim.update(dt);
-            if (newHits > 0) flash = 0.15f;
-            if (sim.finished()) {
-                logic.endArena(sim.hits);
-                sim = null;
-                joyActive = false;
-                joyX = 0f;
-                joyY = 0f;
+            // урон игроку применяется сразу, в момент касания фигурой
+            for (int i = 0; i < newHits; i++) {
+                logic.arenaHit();
+                flash = 0.15f;
+                shake = Math.max(shake, 0.2f);
+                sounds.play("hurt");
+            }
+            if (sim.attackStarts > lastAttackStarts) {
+                lastAttackStarts = sim.attackStarts;
+                sounds.play("whoosh");
+            }
+            if (logic.playerHp <= 0 || sim.finished()) {
+                endArenaNow();
             }
         } else if (logic.phase == BattleLogic.Phase.MENU || logic.phase == BattleLogic.Phase.MORSE) {
             stepMenuFromJoystick();
