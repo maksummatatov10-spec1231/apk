@@ -16,7 +16,10 @@ import random
 import struct
 import wave
 
-import espeakng_loader as el
+try:
+    import espeakng_loader as el
+except ImportError:  # нужен только движку eSpeak
+    el = None
 
 # (id, текст на экране, как произносить, помехи)
 PHRASES = [
@@ -110,6 +113,40 @@ PHRASES = [
 SR = 22050
 PITCH = 72     # выше обычного: тонкий голос
 RATE = 158     # слова в минуту
+
+
+class RhvSpeaker:
+    """Синтез RHVoice (русские голоса, HTS): тот же интерфейс, что у Speaker.
+
+    Голос выбирается переменной RHVOICE_VOICE (по умолчанию Aleksandr). Частота 24 кГц
+    пересчитывается в SR линейной интерполяцией.
+    """
+
+    def __init__(self, voice=None):
+        import rhvoice
+        self.rhv = rhvoice
+        self.engine = rhvoice.Engine()
+        self.voice = voice or os.environ.get("RHVOICE_VOICE", "Aleksandr")
+
+    def say(self, text):
+        # Скорость и тон через SynthParams в этой сборке не действуют (длительность не меняется),
+        # поэтому используются голоса как есть.
+        ok, sr, samples = self.engine.say(text, voice=self.voice)
+        if not ok or not samples:
+            raise SystemExit("RHVoice: синтез не удался: " + text)
+        x = [v / 32768.0 for v in samples]
+        if sr != SR:
+            ratio = sr / SR
+            n_out = int(len(x) / ratio)
+            out = []
+            for i in range(n_out):
+                pos = i * ratio
+                j = int(pos)
+                f = pos - j
+                b = x[j + 1] if j + 1 < len(x) else x[j]
+                out.append(x[j] + (b - x[j]) * f)
+            x = out
+        return x
 
 
 class Speaker:
@@ -220,16 +257,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="res/raw")
     ap.add_argument("--java", default="src/com/example/spamton/VoiceLines.java")
+    ap.add_argument("--engine", choices=["espeak", "rhvoice"], default="rhvoice",
+                    help="espeak — eSpeak NG (прежняя озвучка); rhvoice — RHVoice (по умолчанию)")
     args = ap.parse_args()
 
     entries = []
-    speaker = Speaker()
+    speaker = RhvSpeaker() if args.engine == "rhvoice" else Speaker()
     for idx, (pid, shown, speech, glitch_on) in enumerate(PHRASES):
         x = speaker.say(speech)
         if not x:
             raise SystemExit("пустой синтез: " + pid)
         x = normalize(x)
-        x = smooth(x)
+        if args.engine == "espeak":
+            x = smooth(x)
         if glitch_on:
             x = glitch(x, random.Random(1000 + idx))
         x = normalize(x, 0.8)
