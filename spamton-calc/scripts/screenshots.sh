@@ -2,6 +2,7 @@
 # Снимки экранов в docs/screens/ (PNG) из того же кода экрана, что в APK.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$HERE"
 T="${ANDROID_TOOLCHAIN:-$HOME/android-toolchain}"
 OUT="$HERE/build/ui"
 rm -rf "$OUT" && mkdir -p "$OUT/classes"

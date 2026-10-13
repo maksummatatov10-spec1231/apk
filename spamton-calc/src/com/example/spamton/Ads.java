@@ -9,9 +9,9 @@ public final class Ads {
 
     /** Бегущая строка сверху. */
     public static final String TICKER =
-            "   *** MEGA DEAL *** 2+2 FOR ONLY 5 KROMER *** BUY NOW *** "
-          + "NO REFUNDS *** I'M NOT A ROBOT *** GENEROSITY!!! *** "
-          + "CALCULATOR PRO MAX ULTRA *** HOLD ME *** ";
+            "   *** МЕГА СКИДКА *** 2+2 ВСЕГО ЗА 5 КРОМЕРОВ *** КУПИ СЕЙЧАС *** "
+          + "БЕЗ ВОЗВРАТА *** Я НЕ РОБОТ *** ЩЕДРОСТЬ!!! *** "
+          + "КАЛЬКУЛЯТОР ПРО МАКС УЛЬТРА *** ОБНИМИ МЕНЯ *** ";
 
     /** Всплывающее объявление: заголовок, текст, текст кнопки. */
     public static final class Popup {
@@ -27,19 +27,19 @@ public final class Ads {
     }
 
     static final Popup[] POPUPS = {
-            new Popup("!!! FREE !!!", "WANT IT FOR FREE?? WATCH 1 AD!", "WATCH"),
-            new Popup("MEGA DEAL", "BUY A CALCULATOR, GET A SECOND ONE 50% OFF!!", "BUY"),
-            new Popup("[ BIG SHOT ]", "CORRECT ANSWER FOR 3 KROMER!!! TRUST ME!!", "PAY"),
-            new Popup("CONGRATULATIONS!!", "YOU ARE OUR 1,000,000th USER!!! CLICK!", "CLAIM"),
-            new Popup("SUBSCRIBE!!!", "10 KROMER A WEEK FOR ANSWERS THAT ARE SORT OF RIGHT", "YES"),
-            new Popup("WARNING!!!", "YOUR PHONE IS SLOW. BUY BOOSTER!!!", "FIX"),
+            new Popup("!!! БЕСПЛАТНО !!!", "ХОЧЕШЬ БЕСПЛАТНО?? ПОСМОТРИ 1 РЕКЛАМУ!", "СМОТРЕТЬ"),
+            new Popup("МЕГА СКИДКА", "КУПИ КАЛЬКУЛЯТОР, ВТОРОЙ В ПОДАРОК, ЕЩЕ 50% СКИДКА!!", "КУПИТЬ"),
+            new Popup("[ БОЛЬШОЙ ШОТ ]", "ПРАВИЛЬНЫЙ ОТВЕТ ЗА 3 КРОМЕРА!!! ПОВЕРЬ МНЕ!!", "ОПЛАТИТЬ"),
+            new Popup("ПОЗДРАВЛЯЕМ!!", "ТЫ НАШ 1 000 000-Й ПОЛЬЗОВАТЕЛЬ!!! НАЖМИ!", "ЗАБРАТЬ"),
+            new Popup("ПОДПИШИСЬ!!!", "10 КРОМЕРОВ В НЕДЕЛЮ ЗА ОТВЕТЫ, КОТОРЫЕ ПОЧТИ ВЕРНЫ", "ДА"),
+            new Popup("ВНИМАНИЕ!!!", "ТВОЙ ТЕЛЕФОН ТОРМОЗИТ. КУПИ УСКОРИТЕЛЬ!!!", "ИСПРАВИТЬ"),
     };
 
-    /** Фраза, если Спамтон побеждён и реклама прекращена. */
+    /** Фразы, если Спамтон побеждён и реклама прекращена. */
     public static final String[] FRIENDLY_TIPS = {
-            "TIP: TAP THE DISPLAY TO COPY THE ANSWER.",
-            "TIP: HOLD A BUTTON TO... NO, NEVER MIND.",
-            "TIP: I WILL NOT SELL YOU ANYTHING ANYMORE.",
+            "СОВЕТ: НАЖМИ НА ДИСПЛЕЙ, ЧТОБЫ СКОПИРОВАТЬ ОТВЕТ.",
+            "СОВЕТ: ДЕРЖИ КНОПКУ... НЕТ, ЛУЧШЕ НЕ НАДО.",
+            "СОВЕТ: Я БОЛЬШЕ НИЧЕГО ТЕБЕ НЕ ПРОДАМ.",
     };
 
     public static Popup randomPopup(Random rnd) {

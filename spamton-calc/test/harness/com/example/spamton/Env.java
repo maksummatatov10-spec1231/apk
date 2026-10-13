@@ -41,8 +41,13 @@ final class Env {
         view = new SpamtonView(new Context(), sounds, store, new Random(seed));
         view.layout(0, 0, W, H);
         view.onSizeChanged(W, H, 0, 0);
-        // Тот же портрет, что грузит MainActivity из res/drawable-nodpi/spamton.png.
-        view.setPortrait(new android.graphics.Bitmap("res/drawable-nodpi/spamton.png", 126, 126));
+        // Те же портреты, что грузит MainActivity: по эмоции, если файл есть в res/drawable-nodpi.
+        java.util.Map<Mood, android.graphics.Bitmap> portraits = new java.util.EnumMap<>(Mood.class);
+        for (Mood m : Mood.values()) {
+            java.io.File f = new java.io.File("res/drawable-nodpi/" + m.resName() + ".png");
+            if (f.exists()) portraits.put(m, new android.graphics.Bitmap(f.getPath(), 126, 126));
+        }
+        view.setPortraits(portraits);
     }
 
     /** Журнал команд рисования текущего кадра (см. scripts/render_ops.py). */
@@ -68,6 +73,9 @@ final class Env {
     }
 
     void advance(float seconds) { view.advanceForTest(seconds); }
+
+    /** Эмоция Спамтона сейчас. */
+    Mood mood() { return view.mood(); }
 
     /** Закрывает рекламу: она перекрывает ввод, пока её не закроют. */
     void dismissAds() {

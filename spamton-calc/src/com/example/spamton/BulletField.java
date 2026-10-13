@@ -27,7 +27,7 @@ public final class BulletField {
         }
     }
 
-    private static final String[] WORDS = {"$", "DEAL", "!!", "SALE", "KROMER", "FREE", "!!!", "BUY"};
+    private static final String[] WORDS = {"$", "СДЕЛКА", "!!", "СКИДКА", "КРОМЕР", "ДАРОМ", "!!!", "КУПИ"};
 
     private final Random rnd;
     private final List<Bullet> bullets = new ArrayList<>();
@@ -71,7 +71,7 @@ public final class BulletField {
             float y = 10f + rnd.nextFloat() * (HEIGHT - 30f);
             float vx = (fromLeft ? 1 : -1) * (55f + rnd.nextFloat() * 20f);
             float x = fromLeft ? -16f : WIDTH + 2f;
-            bullets.add(new Bullet("COUPON", x, y, 14f, 6f, vx, 0f));
+            bullets.add(new Bullet("КУПОН", x, y, 14f, 6f, vx, 0f));
         }
 
         int stepHits = 0;

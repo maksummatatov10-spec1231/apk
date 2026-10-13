@@ -28,7 +28,13 @@ public final class MainActivity extends Activity {
         };
         sounds = new AndroidSounds(this);
         view = new SpamtonView(this, sounds, store, new Random());
-        view.setPortrait(android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.spamton));
+        // Портреты по эмоциям: если картинки для эмоции нет, Спамтон показывает NEUTRAL.
+        java.util.Map<Mood, android.graphics.Bitmap> portraits = new java.util.EnumMap<>(Mood.class);
+        for (Mood m : Mood.values()) {
+            int id = getResources().getIdentifier(m.resName(), "drawable", getPackageName());
+            if (id != 0) portraits.put(m, android.graphics.BitmapFactory.decodeResource(getResources(), id));
+        }
+        view.setPortraits(portraits);
         setContentView(view);
     }
 

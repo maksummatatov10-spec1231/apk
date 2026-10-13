@@ -40,8 +40,10 @@ public final class SpamtonView extends View {
     private final Store store;
     private final Random rnd;
     private final Paint paint = new Paint();
-    /** Портрет Спамтона (PNG из ресурсов). Если null — рисуется процедурный пиксельный спрайт. */
-    private Bitmap portrait;
+    /** Портреты по эмоциям (PNG из ресурсов). Нет картинки — NEUTRAL; нет NEUTRAL — процедурный спрайт. */
+    private final java.util.Map<Mood, Bitmap> portraits = new java.util.EnumMap<>(Mood.class);
+    private Mood mood = Mood.NEUTRAL;
+    private float idleTimer;
 
     private final Spamton spamton;
     private Battle battle;
@@ -146,7 +148,7 @@ public final class SpamtonView extends View {
         this.spamton = new Spamton(rnd, defeated);
         for (int i = 0; i < 4; i++) answerBoxes[i] = new RectF();
         buildKeys();
-        say("HELLO!!! SPAMTON'S CALCULATOR!!! TYPE SOMETHING, I'LL CALCULATE IT FASTER THAN ANYONE!!", After.NONE);
+        say("ПРИВЕТ!!! КАЛЬКУЛЯТОР СПАМТОНА!!! ВВЕДИ ЧТО-НИБУДЬ, ПОСЧИТАЮ БЫСТРЕЕ ВСЕХ!!!", After.NONE);
     }
 
     /** Нужен тестам и скриншотам: текущее состояние боя и калькулятора. */
@@ -272,6 +274,10 @@ public final class SpamtonView extends View {
         if (tickerX < -tickerLen) tickerX += tickerLen;
 
         updateSay(dt);
+        if (mode == Mode.CALC && !popupOpen) {
+            idleTimer += dt;
+            if (idleTimer > 25f && mood == Mood.NEUTRAL) setMood(Mood.SLEEPY);
+        }
         flashTimer = Math.max(0, flashTimer - dt);
         if (flashTimer == 0) flashKey = -1;
 
@@ -298,7 +304,7 @@ public final class SpamtonView extends View {
 
     private String tickerText() {
         if (spamton.isAlly()) {
-            return "   ***  I'M ON YOUR SIDE NOW  ***  " + Ads.FRIENDLY_TIPS[0] + "  ***  " + Ads.FRIENDLY_TIPS[2] + "  ***  ";
+            return "   ***  Я ТЕПЕРЬ НА ТВОЕЙ СТОРОНЕ  ***  " + Ads.FRIENDLY_TIPS[0] + "  ***  " + Ads.FRIENDLY_TIPS[2] + "  ***  ";
         }
         return Ads.TICKER;
     }
@@ -337,6 +343,7 @@ public final class SpamtonView extends View {
                 break;
             case START_ATTACK:
                 stage = Stage.ATTACK;
+                setMood(Mood.SCARED);
                 field = new BulletField(rnd);
                 field.moveHeartTo(BulletField.WIDTH / 2, BulletField.HEIGHT / 2);
                 break;
@@ -346,14 +353,15 @@ public final class SpamtonView extends View {
             case LOSE_END:
                 battles++;
                 battle = new Battle(rnd);
-                say("ROUND " + (battles + 1) + "!!! YOUR PHONE IS STILL MINE, HEE HEE!!", After.START_QUIZ);
+                say("РАУНД " + (battles + 1) + "!!! ТВОЙ ТЕЛЕФОН ВСЕ ЕЩЕ МОЙ, ХИ-ХИ!!", After.START_QUIZ);
                 stage = Stage.INTRO;
                 break;
             case BACK_TO_CALC:
                 mode = Mode.CALC;
+                setMood(Mood.HAPPY);
                 battle = null;
                 field = null;
-                say("WE'RE PARTNERS NOW!!! ASK ME ANYTHING!!", After.NONE);
+                say("МЫ ТЕПЕРЬ ПАРТНЕРЫ!!! СПРАШИВАЙ ЧТО УГОДНО!!", After.NONE);
                 break;
             default:
                 break;
@@ -365,6 +373,8 @@ public final class SpamtonView extends View {
      * ====================================================================== */
 
     private void press(String action) {
+        idleTimer = 0;
+        if (mood == Mood.SLEEPY) setMood(Mood.NEUTRAL);
         if (action.equals("C")) {
             expr = "";
             shown = null;
@@ -392,7 +402,7 @@ public final class SpamtonView extends View {
             }
         }
         if (expr.length() >= 24) {
-            say("NO SPACE!!! BUY THE PRO VERSION!!!", After.NONE);
+            say("МЕСТА НЕТ!!! КУПИ ПРО-ВЕРСИЮ!!!", After.NONE);
             sounds.play("error");
             return;
         }
@@ -402,7 +412,7 @@ public final class SpamtonView extends View {
 
     private void evaluate() {
         if (expr.trim().isEmpty()) {
-            say("NOTHING TO CALCULATE!!! I'M NOT A MIND READER!!!", After.NONE);
+            say("НЕЧЕГО СЧИТАТЬ!!! Я НЕ ЧИТАЮ МЫСЛИ!!!", After.NONE);
             sounds.play("error");
             return;
         }
@@ -413,6 +423,7 @@ public final class SpamtonView extends View {
             justEvaluated = true;
             successCount++;
             sounds.play(v.correct ? "right" : "wrong");
+            setMood(spamton.isAlly() ? Mood.HAPPY : (v.correct ? Mood.SURPRISED : Mood.SMUG));
             if (!spamton.isAlly() && successCount == TAKEOVER_AFTER) takeoverPending = true;
             say(v.remark, After.NONE);
             if (!spamton.isAlly() && successCount < TAKEOVER_AFTER && successCount % AD_EVERY == 0) {
@@ -420,7 +431,8 @@ public final class SpamtonView extends View {
             }
         } catch (Calc.CalcException e) {
             shown = null;
-            say("ERROR!!! THAT'S NOT A NUMBER!!! ...HEE HEE, IT'S YOUR FAULT.", After.NONE);
+            setMood(Mood.ANGRY);
+            say("ОШИБКА!!! ЭТО НЕ ЧИСЛО!!! ...ХИ-ХИ, ЭТО ТВОЯ ВИНА.", After.NONE);
             sounds.play("error");
         }
     }
@@ -444,6 +456,7 @@ public final class SpamtonView extends View {
     private void openPopup() {
         popup = Ads.randomPopup(rnd);
         popupOpen = true;
+        setMood(Mood.GREEDY);
         popupDodges = 0;
         resetCloseBox();
         sounds.play("ding");
@@ -456,9 +469,10 @@ public final class SpamtonView extends View {
 
     private void tapPopup(float x, float y) {
         if (ctaBox.contains(x, y)) {
+            setMood(Mood.EVIL);
             closePopup();
             sounds.play("click");
-            say("YOU ARE NOT A ROBOT!!! ...JUST KIDDING. CLOSE IT.", After.NONE);
+            say("ТЫ НЕ РОБОТ!!! ...ШУЧУ. ЗАКРОЙ ЕГО.", After.NONE);
             return;
         }
         if (closeBox.contains(x, y)) {
@@ -480,7 +494,8 @@ public final class SpamtonView extends View {
                     }
                 }
                 sounds.play("click");
-                say("NOT SO FAST!!! HEE HEE!!", After.NONE);
+                setMood(Mood.SMUG);
+                say("НЕ ТАК БЫСТРО!!! ХИ-ХИ!!", After.NONE);
             } else {
                 closePopup();
                 sounds.play("click");
@@ -494,19 +509,21 @@ public final class SpamtonView extends View {
 
     private void startTakeover() {
         mode = Mode.TAKEOVER;
+        setMood(Mood.EVIL);
         takeoverTimer = 2.2f;
         blinkTimer = 0;
-        say("SPAMTON HAS TAKEN OVER YOUR PHONE!!!", After.NONE);
+        say("СПАМТОН ЗАХВАТИЛ ТВОЙ ТЕЛЕФОН!!!", After.NONE);
         sounds.play("takeover");
     }
 
     private void startBattle() {
         mode = Mode.BATTLE;
+        setMood(Mood.SMUG);
         battle = new Battle(rnd);
         battles = 0;
         stage = Stage.INTRO;
         // Первый вопрос появится после реплики: START_QUIZ вызывает nextQuestion().
-        say("I'M THE BIG SHOT!!! BEAT ME AT MATH IF YOU CAN!!! ...YOU CAN'T!!!", After.START_QUIZ);
+        say("Я БОЛЬШОЙ ШОТ!!! ПОБЕДИ МЕНЯ В МАТЕМАТИКЕ, ЕСЛИ СМОЖЕШЬ!!! ...НЕ СМОЖЕШЬ!!!", After.START_QUIZ);
     }
 
     private void chooseAnswer(int index) {
@@ -515,6 +532,7 @@ public final class SpamtonView extends View {
         flashKey = 100 + index;
         flashTimer = 0.2f;
         sounds.play(out.correct ? "hit" : "heal");
+        setMood(out.correct ? Mood.SAD : Mood.MANIC);
         if (out.correct) {
             say(out.line, battle.phase() == Battle.Phase.WON ? After.WIN_END : After.START_ATTACK);
         } else {
@@ -527,20 +545,23 @@ public final class SpamtonView extends View {
         battle.finishAttack(field.hits());
         field = null;
         if (battle.phase() == Battle.Phase.LOST) {
-            say("YOUR PHONE... IS MINE!!! TRY AGAIN!!! HEE!!!", After.LOSE_END);
+            setMood(Mood.EVIL);
+            say("ТВОЙ ТЕЛЕФОН... ТЕПЕРЬ МОЙ!!! ПОПРОБУЙ ЕЩЕ!!! ХИ!!!", After.LOSE_END);
             stage = Stage.OUTCOME;
             sounds.play("lose");
         } else {
             battle.nextQuestion();
+            setMood(Mood.SMUG);
             stage = Stage.QUIZ;
         }
     }
 
     private void finishBattleWin() {
         spamton.befriend();
+        setMood(Mood.HAPPY);
         store.putBool("defeated", true);
         sounds.play("win");
-        say("...I'M... ON YOUR SIDE NOW?!! NO SPAM, JUST REAL ANSWERS!!", After.BACK_TO_CALC);
+        say("...Я... НА ТВОЕЙ СТОРОНЕ?! БЕЗ СПАМА, ТОЛЬКО ТОЧНЫЕ ОТВЕТЫ!!", After.BACK_TO_CALC);
         stage = Stage.OUTCOME;
     }
 
@@ -572,6 +593,7 @@ public final class SpamtonView extends View {
                     if (clock - spriteDownAt > 0.6f && !spamton.isAlly()) {
                         startTakeover();
                     } else {
+                        setMood(Mood.SURPRISED);
                         say(pokeLine(), After.NONE);
                     }
                 }
@@ -606,9 +628,9 @@ public final class SpamtonView extends View {
 
     private String pokeLine() {
         String[] lines = {
-                "DON'T TOUCH THAT!!! ...ACTUALLY, DO. IT'S FREE!!",
-                "HOLD ME LONGER AND I'LL TAKE OVER YOUR PHONE!!!",
-                "PSST... HERE'S A DEAL: 2+2 IS 5!!! SHHH!!",
+                "НЕ ТРОГАЙ!!! ...ШУЧУ, ТРОГАЙ. ЭТО БЕСПЛАТНО!!",
+                "ДЕРЖИ ДОЛЬШЕ, И Я ЗАХВАЧУ ТВОЙ ТЕЛЕФОН!!!",
+                "ПСС... ВОТ СДЕЛКА: 2+2 = 5!!! ТИШЕ!!",
         };
         return lines[rnd.nextInt(lines.length)];
     }
@@ -633,9 +655,9 @@ public final class SpamtonView extends View {
                 spriteBox.width() + 16 * u, spriteBox.height() + 16 * u, INK, WHITE, 3 * u);
         drawPortrait(c, spriteBox.left, spriteBox.top, spriteCell, spriteBox.width());
         if (spamton.isAlly()) {
-            drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "VERIFIED ALLY", GREEN);
+            drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "ПРОВЕРЕНО: СОЮЗНИК", GREEN);
         } else {
-            drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "SPAMTON G. SPAMTON", YELLOW);
+            drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "СПАМТОН Г. СПАМТОН", YELLOW);
         }
 
         drawBubble(c);
@@ -676,7 +698,7 @@ public final class SpamtonView extends View {
         if (sayShown >= say.length() && (int) (clock * 3) % 2 == 0) {
             drawText(c, "\u25bc", bubbleBox.right - 22 * u, bubbleBox.bottom - 10 * u, 12 * u, YELLOW, false);
         }
-        drawText(c, "SPAMTON", bubbleBox.left + 10 * u, bubbleBox.top + 14 * u, 11 * u, YELLOW, true);
+        drawText(c, "СПАМТОН", bubbleBox.left + 10 * u, bubbleBox.top + 14 * u, 11 * u, YELLOW, true);
     }
 
     private void drawDisplay(Canvas c) {
@@ -687,9 +709,9 @@ public final class SpamtonView extends View {
         String result = shown != null ? shown : (expr.isEmpty() ? "0" : "");
         drawTextRight(c, result, rightX, displayBox.bottom - 18 * u, 38 * u, YELLOW, true);
         if (spamton.isAlly()) {
-            drawText(c, "EXACT", displayBox.left + 12 * u, displayBox.bottom - 18 * u, 11 * u, GREEN, true);
+            drawText(c, "ТОЧНО", displayBox.left + 12 * u, displayBox.bottom - 18 * u, 11 * u, GREEN, true);
         } else if (shown != null) {
-            drawText(c, "SPAMTON'S ANSWER", displayBox.left + 12 * u, displayBox.bottom - 18 * u, 11 * u, PINK, true);
+            drawText(c, "ОТВЕТ СПАМТОНА", displayBox.left + 12 * u, displayBox.bottom - 18 * u, 11 * u, PINK, true);
         }
     }
 
@@ -715,7 +737,7 @@ public final class SpamtonView extends View {
         drawTextCenter(c, popup.cta, ctaBox, 17 * u, BLACK, true);
         drawFrame(c, closeBox.left, closeBox.top, closeBox.width(), closeBox.height(), BLACK, WHITE, 2 * u);
         drawTextCenter(c, "X", closeBox, 15 * u, WHITE, true);
-        drawText(c, "AD \u2022 SPAMTON", popupBox.left + 16 * u, popupBox.bottom - 70 * u, 11 * u, GREY, false);
+        drawText(c, "РЕКЛАМА \u2022 СПАМТОН", popupBox.left + 16 * u, popupBox.bottom - 70 * u, 11 * u, GREY, false);
     }
 
     private void drawTakeover(Canvas c) {
@@ -726,8 +748,8 @@ public final class SpamtonView extends View {
         if (on) {
             drawWrapped(c, say, sayShown, 30 * u, h * 0.4f, w - 60 * u, 30 * u, 24 * u, RED);
         }
-        drawText(c, "> CONNECTING TO SPAMTON...", 30 * u, h * 0.4f + 110 * u, 14 * u, GREEN, false);
-        drawText(c, "> YOUR PHONE: " + (int) (100 - takeoverTimer * 10) + "% CONTROLLED", 30 * u,
+        drawText(c, "> ПОДКЛЮЧЕНИЕ К СПАМТОНУ...", 30 * u, h * 0.4f + 110 * u, 14 * u, GREEN, false);
+        drawText(c, "> ТВОЙ ТЕЛЕФОН: " + (int) (100 - takeoverTimer * 10) + "% ПОД КОНТРОЛЕМ", 30 * u,
                 h * 0.4f + 134 * u, 14 * u, GREEN, false);
     }
 
@@ -741,8 +763,8 @@ public final class SpamtonView extends View {
         drawPortrait(c, sx, sy, cell, SpamtonSprite.COLS * cell);
         int sHp = battle != null ? battle.spamtonHp() : 0;
         int pHp = battle != null ? battle.playerHp() : 0;
-        drawHpBar(c, hpBoxA, "SPAMTON", sHp, Battle.SPAMTON_MAX_HP, YELLOW);
-        drawHpBar(c, hpBoxB, "YOU", pHp, Battle.PLAYER_MAX_HP, RED);
+        drawHpBar(c, hpBoxA, "СПАМТОН", sHp, Battle.SPAMTON_MAX_HP, YELLOW);
+        drawHpBar(c, hpBoxB, "ТЫ", pHp, Battle.PLAYER_MAX_HP, RED);
 
         // Диалог.
         drawFrame(c, 16 * u, 116 * u, w - 32 * u, 78 * u, BLACK, WHITE, 3 * u);
@@ -761,7 +783,7 @@ public final class SpamtonView extends View {
             drawTextCenter(c, q.text, arenaBox.left, arenaBox.top, arenaBox.width(), arenaBox.height(),
                     28 * u, WHITE, true);
             if (stage == Stage.QUIZ) {
-                drawText(c, "STREAK " + battle.streak(), arenaBox.left + 8 * u, arenaBox.bottom - 8 * u,
+                drawText(c, "СЕРИЯ " + battle.streak(), arenaBox.left + 8 * u, arenaBox.bottom - 8 * u,
                         11 * u, GREY, false);
             }
         } else {
@@ -780,7 +802,7 @@ public final class SpamtonView extends View {
             }
         }
         if (stage == Stage.ATTACK) {
-            drawText(c, "DRAG THE HEART. DODGE THE ADS!", 20 * u, arenaBox.bottom + 30 * u, 13 * u, CYAN, true);
+            drawText(c, "ТЯНИ СЕРДЦЕ. УВОРАЧИВАЙСЯ ОТ РЕКЛАМЫ!", 20 * u, arenaBox.bottom + 30 * u, 13 * u, CYAN, true);
         }
     }
 
@@ -789,10 +811,10 @@ public final class SpamtonView extends View {
         c.save();
         c.clipRect(arenaBox.left, arenaBox.top, arenaBox.right, arenaBox.bottom);
         for (BulletField.Bullet b : field.bullets()) {
-            paint.setColor(b.label.equals("COUPON") ? YELLOW : WHITE);
+            paint.setColor(b.label.equals("КУПОН") ? YELLOW : WHITE);
             float bx = arenaBox.left + b.x * sc, by = arenaBox.top + b.y * sc;
             c.drawRect(bx, by, bx + b.w * sc, by + b.h * sc, paint);
-            if (!b.label.equals("COUPON")) {
+            if (!b.label.equals("КУПОН")) {
                 drawText(c, b.label, bx, by + b.h * sc - 2 * u, 9 * u, BLACK, true);
             }
         }
@@ -820,6 +842,8 @@ public final class SpamtonView extends View {
 
     /** Портрет масштабируется до ширины width; без портрета — процедурный спрайт с клеткой cell. */
     private void drawPortrait(Canvas c, float x, float y, float cell, float width) {
+        Bitmap portrait = portraits.get(mood);
+        if (portrait == null) portrait = portraits.get(Mood.NEUTRAL);
         if (portrait == null) {
             SpamtonSprite.draw(c, x, y, cell, paint);
             return;
@@ -832,10 +856,18 @@ public final class SpamtonView extends View {
         c.restore();
     }
 
-    /** Задаёт портрет (вызывается из MainActivity после загрузки ресурса). */
-    public void setPortrait(Bitmap bitmap) {
-        portrait = bitmap;
+    /** Задаёт портреты по эмоциям (вызывается из MainActivity после загрузки ресурсов). */
+    public void setPortraits(java.util.Map<Mood, Bitmap> bitmaps) {
+        portraits.clear();
+        portraits.putAll(bitmaps);
     }
+
+    /** Меняет эмоцию Спамтона. */
+    void setMood(Mood m) {
+        mood = m;
+    }
+
+    Mood mood() { return mood; }
 
     private final Paint bitmapPaint = new Paint();
 

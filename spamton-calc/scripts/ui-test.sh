@@ -3,6 +3,7 @@
 # Android-заглушки из test/stubs (Canvas/View на AWT), код экрана — тот же, что в APK.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$HERE"
 T="${ANDROID_TOOLCHAIN:-$HOME/android-toolchain}"
 OUT="$HERE/build/ui"
 rm -rf "$OUT" && mkdir -p "$OUT/classes"

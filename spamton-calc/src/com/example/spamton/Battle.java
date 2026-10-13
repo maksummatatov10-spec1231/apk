@@ -85,16 +85,16 @@ public final class Battle {
             spamtonHp = Math.max(0, spamtonHp - dmg);
             if (spamtonHp == 0) {
                 phase = Phase.WON;
-                return new Outcome(true, dmg, 0, "NOOO... MY ACCOUNT... HOW?!");
+                return new Outcome(true, dmg, 0, "НЕЕЕТ... МОЙ АККАУНТ... КАК?!");
             }
             phase = Phase.ATTACK;
-            return new Outcome(true, dmg, 0, "HMPH!! LUCKY HIT!! ...ANYWAY, MY TURN!!");
+            return new Outcome(true, dmg, 0, "ХМ!! ПОВЕЗЛО!! ...НУ ЛАДНО, МОЙ ХОД!!");
         }
         streak = 0;
         int healed = Math.min(HEAL_ON_WRONG, SPAMTON_MAX_HP - spamtonHp);
         spamtonHp += healed;
         phase = Phase.ATTACK;
-        return new Outcome(false, 0, healed, "WRONG!!! MY SPAM IS STRONGER!! HEE HEE!!");
+        return new Outcome(false, 0, healed, "НЕВЕРНО!!! МОЙ СПАМ СИЛЬНЕЕ!! ХИ-ХИ!!");
     }
 
     /** Фаза уклонения окончена: списывает урон за попадания. */

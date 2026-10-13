@@ -26,25 +26,25 @@ public final class Spamton {
     }
 
     static final String[] WRONG_REMARKS = {
-            "I CALCULATED IT!!! TRUST ME!!",
-            "EXACT ANSWER!!! ONLY FOR YOU!!",
-            "ALMOST RIGHT... BUY THE FULL VERSION!!",
-            "HERE'S YOUR ANSWER!! $$$ 100% GUARANTEED $$$",
-            "I'M NOT WRONG!! I'M A BIG SHOT!!",
-            "MATH IS EASY!!! I'M A GENIUS!!!",
+            "Я ПОСЧИТАЛ!!! ПОВЕРЬ МНЕ!!",
+            "ТОЧНЫЙ ОТВЕТ!!! ТОЛЬКО ДЛЯ ТЕБЯ!!",
+            "ПОЧТИ ВЕРНО... КУПИ ПОЛНУЮ ВЕРСИЮ!!",
+            "ВОТ ТВОЙ ОТВЕТ!! $$$ 100% ГАРАНТИЯ $$$",
+            "Я НЕ ОШИБАЮСЬ!! Я БОЛЬШОЙ ШОТ!!",
+            "МАТЕМАТИКА ЛЕГКА!!! Я ГЕНИЙ!!!",
     };
 
     static final String[] LUCKY_REMARKS = {
-            "...WOW!! I GOT IT RIGHT!! FOR NOW!!",
-            "LUCKY!!! DON'T GET USED TO IT!!",
-            "THIS ONE'S ON THE HOUSE!!! ...FOR NOW",
+            "...ВАУ!! ПОЛУЧИЛОСЬ!! ПОКА ЧТО!!",
+            "ПОВЕЗЛО!!! НЕ ПРИВЫКАЙ!!",
+            "ЭТО ЗА СЧЕТ ЗАВЕДЕНИЯ!!! ...ПОКА ЧТО",
     };
 
     static final String[] ALLY_REMARKS = {
-            "HERE'S THE REAL ANSWER. NO CHARGE, FRIEND.",
-            "I'M ON YOUR SIDE NOW!! EXACT RESULT!!",
-            "NO MORE SPAM. JUST THE NUMBERS. PROMISE.",
-            "YOU BEAT ME, SO I'LL HELP YOU. I'M A BIG SHOT, REMEMBER?",
+            "ВОТ ТОЧНЫЙ ОТВЕТ. БЕЗ ОПЛАТЫ, ДРУГ.",
+            "Я ТЕПЕРЬ НА ТВОЕЙ СТОРОНЕ!! ТОЧНЫЙ РЕЗУЛЬТАТ!!",
+            "НИКАКОГО СПАМА. ТОЛЬКО ЧИСЛА. ОБЕЩАЮ.",
+            "ТЫ МЕНЯ ПОБЕДИЛ, ПОЭТОМУ ПОМОГУ. Я ВЕДЬ БОЛЬШОЙ ШОТ, ПОМНИШЬ?",
     };
 
     private final Random rnd;

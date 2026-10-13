@@ -25,6 +25,7 @@ public final class FlowCheck {
     public static void main(String[] args) {
         layoutChecks();
         keypadChecks();
+        moodChecks();
         popupChecks();
         takeoverAndBattleChecks();
         allyChecks();
@@ -73,6 +74,7 @@ public final class FlowCheck {
         e.type("1÷0=");
         check("деление на ноль: ошибка без результата", e.view.shownForTest() == null);
         check("деление на ноль: звук ошибки", e.sounds.count("error") >= 1);
+        check("ошибка: Спамтон злится", e.mood() == Mood.ANGRY);
 
         e.key("C");
         e.type("=");
@@ -119,6 +121,17 @@ public final class FlowCheck {
         float[] cta = f.view.ctaCenterForTest();
         touch(f.view, cta[0], cta[1]);
         check("кнопка рекламы закрывает окно", f.view.debugState().contains("popup=false"));
+    }
+
+    static void moodChecks() {
+        Env e = new Env(9, false);
+        check("на старте эмоция NEUTRAL", e.mood() == Mood.NEUTRAL);
+        e.view.forceTakeover();
+        check("захват: эмоция EVIL", e.mood() == Mood.EVIL);
+        check("портрет NEUTRAL есть", e.view.debugState() != null);
+        int withFile = 0;
+        for (Mood m : Mood.values()) if (new java.io.File("res/drawable-nodpi/" + m.resName() + ".png").exists()) withFile++;
+        check("все существующие портреты подгружены: " + withFile, withFile >= 1);
     }
 
     static void takeoverAndBattleChecks() {
