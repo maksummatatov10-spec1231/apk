@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Озвучка одной фразы Джанкила: тот же конвейер, что у Спамтона (eSpeak NG + сглаживание).
 
-Голос Джанкила ниже и медленнее, чем у Спамтона: pitch 58, темп 150 слов/мин. Помех нет.
+Голос Джанкила кричащий: выше и быстрее, чем у Спамтона (pitch 92, темп 185 слов/мин),
+громче, с мягким ограничением пиков (tanh) без жёсткого клиппинга. Помех нет.
 Запуск (нужен venv с espeakng-loader; скрипт использует gen_voice.py из spamton-calc):
     /home/user/.venv-render/bin/python build-src/gen_junkil_voice.py
 """
+import math
 import os
 import sys
 
@@ -18,8 +20,14 @@ PHRASE_ID = "bak"
 SHOWN = "ТЫ ЧТО ДЕЛАЕШЬ В МОЁМ БАКЕ?!"
 SPEECH = "Ты что делаешь в моём баке? Ха! Не трогай мой мусор!"
 
-gv.PITCH = 58
-gv.RATE = 150
+gv.PITCH = 92
+gv.RATE = 185
+
+
+def shout(x, drive=2.2):
+    """Громкость без жёсткого клиппинга: мягкое ограничение tanh, пик 0.95."""
+    y = [math.tanh(drive * v) for v in x]
+    return gv.normalize(y, 0.95)
 
 
 def main():
@@ -29,7 +37,7 @@ def main():
         raise SystemExit("пустой синтез")
     x = gv.normalize(x)
     x = gv.smooth(x)
-    x = gv.normalize(x, 0.8)
+    x = shout(x)
     out = os.path.join(HERE, "voice", "junkil_" + PHRASE_ID + ".wav")
     gv.write_wav(out, x)
     print("wrote", out, round(len(x) / gv.SR, 2), "s")
