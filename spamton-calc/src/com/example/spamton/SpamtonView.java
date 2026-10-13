@@ -358,7 +358,7 @@ public final class SpamtonView extends View {
                 break;
             case BACK_TO_CALC:
                 mode = Mode.CALC;
-                setMood(Mood.HAPPY);
+                setMood(Mood.FRIENDLY);
                 battle = null;
                 field = null;
                 say("МЫ ТЕПЕРЬ ПАРТНЕРЫ!!! СПРАШИВАЙ ЧТО УГОДНО!!", After.NONE);
@@ -423,7 +423,7 @@ public final class SpamtonView extends View {
             justEvaluated = true;
             successCount++;
             sounds.play(v.correct ? "right" : "wrong");
-            setMood(spamton.isAlly() ? Mood.HAPPY : (v.correct ? Mood.SURPRISED : Mood.SMUG));
+            setMood(spamton.isAlly() ? Mood.FRIENDLY : (v.correct ? Mood.SURPRISED : Mood.SMUG));
             if (!spamton.isAlly() && successCount == TAKEOVER_AFTER) takeoverPending = true;
             say(v.remark, After.NONE);
             if (!spamton.isAlly() && successCount < TAKEOVER_AFTER && successCount % AD_EVERY == 0) {
@@ -551,7 +551,7 @@ public final class SpamtonView extends View {
             sounds.play("lose");
         } else {
             battle.nextQuestion();
-            setMood(Mood.SMUG);
+            setMood(Mood.FOCUSED);
             stage = Stage.QUIZ;
         }
     }
@@ -593,7 +593,7 @@ public final class SpamtonView extends View {
                     if (clock - spriteDownAt > 0.6f && !spamton.isAlly()) {
                         startTakeover();
                     } else {
-                        setMood(Mood.SURPRISED);
+                        setMood(Mood.EMBARRASSED);
                         say(pokeLine(), After.NONE);
                     }
                 }

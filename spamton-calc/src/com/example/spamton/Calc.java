@@ -32,7 +32,7 @@ public final class Calc {
 
     /** Форматирует число для дисплея: до 10 значащих цифр, без хвостовых нулей. */
     public static String format(double v) {
-        if (Double.isNaN(v) || Double.isInfinite(v)) return "ERROR";
+        if (Double.isNaN(v) || Double.isInfinite(v)) return "ОШИБКА";
         if (v == Math.rint(v) && Math.abs(v) < 1e15) {
             return Long.toString((long) v);
         }
