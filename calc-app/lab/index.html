@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лаборатория решателя</title>
+<style>
+  :root {
+    --surface: #FBF8FD; --card: #F1ECF6; --key: #FFFFFF; --key-func: #E9E2F1; --key-op: #EADDFF;
+    --accent: #6750A4; --on-accent: #FFFFFF; --accent-container: #EADDFF; --on-accent-container: #21005D;
+    --on-surface: #1C1B1F; --muted: #49454F; --error: #B3261E; --outline: #79747E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #141218; --card: #211F26; --key: #2B2930; --key-func: #36343B; --key-op: #4F378B;
+      --accent: #D0BCFF; --on-accent: #381E72; --accent-container: #4F378B; --on-accent-container: #EADDFF;
+      --on-surface: #E6E1E5; --muted: #CAC4D0; --error: #F2B8B5; --outline: #938F99;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Roboto, "Segoe UI", system-ui, sans-serif; background: var(--surface); color: var(--on-surface); }
+  header { padding: 18px 24px 6px; }
+  h1 { margin: 0; font-size: 22px; }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; padding: 16px 24px 40px; max-width: 1280px; margin: 0 auto; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .input-card { background: var(--card); border-radius: 24px; padding: 14px 16px; }
+  textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; outline: none; background: transparent; color: var(--on-surface); font: 22px/1.35 Roboto, "Segoe UI", system-ui, sans-serif; }
+  .row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 6px; }
+  .hint { flex: 1; color: var(--muted); font-size: 13px; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 16px; }
+  .solve { background: var(--accent); color: var(--on-accent); font-weight: 700; padding: 10px 22px; font-size: 15px; }
+  .solve:active { transform: scale(.96); }
+  .keys { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-top: 10px; }
+  .keys button { background: var(--key-func); color: var(--on-surface); padding: 8px 0; font-size: 15px; }
+  .keys button.op { background: var(--key-op); color: var(--on-accent-container); font-weight: 700; }
+  .keys button:hover { filter: brightness(.96); }
+  .results-head { display: flex; justify-content: space-between; align-items: center; margin: 18px 4px 6px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .card { background: var(--card); border-radius: 22px; padding: 14px 16px 16px; margin-bottom: 12px; animation: appear .35s ease both; }
+  @keyframes appear { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .head { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .head.err { color: var(--error); }
+  .query { font-family: ui-monospace, Consolas, monospace; color: var(--muted); font-size: 16px; margin: 4px 0 8px; word-break: break-word; }
+  .answer { display: block; background: var(--accent-container); color: var(--on-accent-container); border-radius: 16px; padding: 10px 14px; margin: 6px 0; font-size: 19px; font-weight: 700; cursor: copy; }
+  .answer:hover { filter: brightness(.97); }
+  .steps-title { font-weight: 700; margin: 14px 0 6px; font-size: 14px; }
+  .step { display: flex; gap: 10px; padding: 3px 0; font-size: 15px; line-height: 1.45; }
+  .num { flex: 0 0 22px; height: 22px; border-radius: 11px; background: var(--accent-container); color: var(--on-accent-container); font-size: 12px; font-weight: 700; text-align: center; line-height: 22px; }
+  .sub-step { padding: 2px 0 2px 32px; color: var(--muted); font-size: 14px; }
+  .note { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin: 4px 0 8px; }
+  .ex { display: block; width: 100%; text-align: left; background: var(--key); color: var(--on-surface); padding: 9px 12px; margin-bottom: 6px; border-radius: 14px; }
+  .ex b { font-family: ui-monospace, Consolas, monospace; font-size: 15px; color: var(--accent); }
+  .ex small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .group { margin-bottom: 14px; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--on-surface); color: var(--surface); padding: 8px 16px; border-radius: 16px; font-size: 14px; opacity: 0; transition: opacity .25s; }
+  .toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Лаборатория решателя</h1>
+  <div class="sub">Тот же код решателя, что в приложении. Введите уравнение или выражение и Ctrl+Enter.</div>
+</header>
+<div class="layout">
+  <main>
+    <div class="input-card">
+      <textarea id="q" placeholder="Например: 9^9  или  2x² − 3x + 1 = 0"></textarea>
+      <div class="keys" id="keys"></div>
+      <div class="row">
+        <div class="hint">Системы: несколько уравнений через «;» или с новой строки</div>
+        <button class="solve" id="solve">Решить</button>
+      </div>
+    </div>
+    <div class="results-head"><span>Результаты</span><button id="clear" style="background:none;color:var(--accent);font-size:13px;letter-spacing:0">Очистить</button></div>
+    <div id="results"></div>
+  </main>
+  <aside>
+    <h2>Примеры из приложения</h2>
+  </aside>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const KEYS = ["x","y","²","³","⁴","^","√(","∛(","π","e",
+              "(",")","·","÷","−","+","=",";","!","%",
+              "sin(","cos(","tan(","ln(","log(","|x|","abs(","10^","n!","1/",
+              "asin(","acos(","atan(","exp(","lg(","°"];
+const OPS = new Set(["^","÷","−","+","=","·",";"]);
+const keysEl = document.getElementById("keys");
+const q = document.getElementById("q");
+
+function insertText(text) {
+  const start = q.selectionStart, end = q.selectionEnd;
+  const cursorBack = text.endsWith("(") ? 0 : (text.endsWith("()") ? 1 : 0);
+  q.value = q.value.slice(0, start) + text + q.value.slice(end);
+  const pos = start + text.length - cursorBack;
+  q.setSelectionRange(pos, pos);
+  q.focus();
+}
+KEYS.forEach(k => {
+  const b = document.createElement("button");
+  b.textContent = k;
+  if (OPS.has(k)) b.className = "op";
+  b.onclick = () => insertText(k);
+  keysEl.appendChild(b);
+});
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1200);
+}
+
+function render(data) {
+  const card = el("div", "card");
+  if (data.error) {
+    card.appendChild(el("div", "head err", "ОШИБКА"));
+    card.appendChild(el("div", "query", data.query || q.value));
+    card.appendChild(el("div", "", data.error));
+  } else {
+    card.appendChild(el("div", "head", data.heading.toUpperCase()));
+    card.appendChild(el("div", "query", data.query));
+    data.answers.forEach(a => {
+      const ans = el("span", "answer", a);
+      ans.title = "Нажмите, чтобы скопировать";
+      ans.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(a); toast("Скопировано"); };
+      card.appendChild(ans);
+    });
+    if (data.steps.length) {
+      card.appendChild(el("div", "steps-title", "Решение по шагам"));
+      let n = 0;
+      data.steps.forEach(s => {
+        const indented = s.startsWith(" ");
+        if (!indented) n++;
+        const t = s.trim();
+        if (indented) {
+          card.appendChild(el("div", "sub-step", t));
+        } else {
+          const row = el("div", "step");
+          row.appendChild(el("div", "num", String(n)));
+          row.appendChild(el("div", "", t));
+          card.appendChild(row);
+        }
+      });
+    }
+    if (data.graph) card.appendChild(el("div", "note", "График функции есть в приложении (здесь текстовая версия)."));
+  }
+  document.getElementById("results").prepend(card);
+}
+
+async function solve() {
+  const query = q.value.trim();
+  if (!query) { toast("Введите выражение или уравнение"); return; }
+  const resp = await fetch("/api/solve", {method: "POST", headers: {"Content-Type": "application/json"},
+                                          body: JSON.stringify({query})});
+  render(await resp.json());
+}
+
+document.getElementById("solve").onclick = solve;
+document.getElementById("clear").onclick = () => { document.getElementById("results").innerHTML = ""; };
+q.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") solve(); });
+
+
+</script>
+</body>
+</html>

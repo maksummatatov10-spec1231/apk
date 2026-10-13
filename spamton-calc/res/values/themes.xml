@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Spamton" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/spamton_bg</item>
+        <item name="android:statusBarColor">@color/spamton_bg</item>
+        <item name="android:navigationBarColor">@color/spamton_bg</item>
+    </style>
+</resources>

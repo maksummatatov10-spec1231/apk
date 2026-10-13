@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Калькулятор и решатель</string>
+    <string name="menu_basic">Обычный</string>
+    <string name="menu_scientific">Научный</string>
+    <string name="menu_equations">Уравнения</string>
+    <string name="menu_history">История</string>
+    <string name="menu_about">О приложении</string>
+    <string name="drawer_subtitle">Калькулятор и решатель уравнений</string>
+    <string name="input_hint">Введите уравнение или систему</string>
+    <string name="solve">Решить</string>
+    <string name="results">Результаты</string>
+    <string name="clear">Очистить</string>
+    <string name="clear_history">Очистить историю</string>
+    <string name="history_empty">История пока пуста.\nВычисления и решённые уравнения появятся здесь.</string>
+    <string name="equations_hint">Введите уравнение или систему, нажмите «Решить» — ответ и шаги появятся здесь.</string>
+    <string name="copied">Скопировано</string>
+    <string name="empty_input">Введите выражение или уравнение</string>
+    <string name="tab_digits">Цифры</string>
+    <string name="tab_functions">Функции</string>
+    <string name="tab_symbols">Символы</string>
+    <string name="help_text">Обычный и научный режимы — как на обычном калькуляторе: нажимайте кнопки, «=» считает результат.\n\nУравнения — отдельный режим. Введите уравнение (знак «=») или систему через «;» и нажмите «Решить». Приложение покажет ОДЗ, шаги, проверку корней и запись для тетради.\n\nИстория сохраняет вычисления и уравнения между запусками.\n\nНажмите на результат, чтобы скопировать его.</string>
+</resources>

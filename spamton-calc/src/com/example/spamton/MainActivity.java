@@ -1,0 +1,49 @@
+package com.example.spamton;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+
+import java.util.Random;
+
+/** Точка входа: полноэкранный калькулятор Спамтона. */
+public final class MainActivity extends Activity {
+
+    private AndroidSounds sounds;
+    private SpamtonView view;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+        final SharedPreferences prefs = getSharedPreferences("spamton", MODE_PRIVATE);
+        Store store = new Store() {
+            @Override public boolean getBool(String key, boolean def) { return prefs.getBoolean(key, def); }
+            @Override public void putBool(String key, boolean value) { prefs.edit().putBoolean(key, value).apply(); }
+        };
+        sounds = new AndroidSounds(this);
+        view = new SpamtonView(this, sounds, store, new Random());
+        // Портреты по эмоциям: если картинки для эмоции нет, Спамтон показывает NEUTRAL.
+        java.util.Map<Mood, android.graphics.Bitmap> portraits = new java.util.EnumMap<>(Mood.class);
+        for (Mood m : Mood.values()) {
+            int id = getResources().getIdentifier(m.resName(), "drawable", getPackageName());
+            if (id != 0) portraits.put(m, android.graphics.BitmapFactory.decodeResource(getResources(), id));
+        }
+        view.setPortraits(portraits);
+        // Текстура белых пуль (бесшовная, повторяется плиткой).
+        int texId = getResources().getIdentifier("bullet_tex", "drawable", getPackageName());
+        if (texId != 0) view.setBulletTexture(android.graphics.BitmapFactory.decodeResource(getResources(), texId));
+        setContentView(view);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (sounds != null) sounds.release();
+        super.onDestroy();
+    }
+}
