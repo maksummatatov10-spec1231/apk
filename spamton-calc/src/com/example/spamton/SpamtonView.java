@@ -67,6 +67,7 @@ public final class SpamtonView extends View {
 
     /* ---------- реплика Спамтона (печатается по буквам) ---------- */
     private String say = "";
+    private boolean voiced;
     private int sayShown;
     private float sayAccum;
     private float holdTimer;
@@ -103,7 +104,6 @@ public final class SpamtonView extends View {
     private final RectF[] answerBoxes = new RectF[4];
     private final RectF hpBoxA = new RectF();
     private final RectF hpBoxB = new RectF();
-    private float spriteCell;
 
     private static final class Key {
         final String label;
@@ -148,7 +148,7 @@ public final class SpamtonView extends View {
         this.spamton = new Spamton(rnd, defeated);
         for (int i = 0; i < 4; i++) answerBoxes[i] = new RectF();
         buildKeys();
-        say("ПРИВЕТ!!! КАЛЬКУЛЯТОР СПАМТОНА!!! ВВЕДИ ЧТО-НИБУДЬ, ПОСЧИТАЮ БЫСТРЕЕ ВСЕХ!!!", After.NONE);
+        say(pick(GREET_LINES), After.NONE);
     }
 
     /** Нужен тестам и скриншотам: текущее состояние боя и калькулятора. */
@@ -198,9 +198,8 @@ public final class SpamtonView extends View {
         // Верх: бегущая строка.
         tickerBox.set(0, 0, w, 30 * u);
         // Сцена: спрайт и реплика.
-        spriteCell = 4.8f * u;
-        spriteBox.set(16 * u, 44 * u, 16 * u + SpamtonSprite.COLS * spriteCell, 44 * u + SpamtonSprite.ROWS * spriteCell);
-        bubbleBox.set(150 * u, 46 * u, w - 14 * u, 46 * u + 170 * u);
+        spriteBox.set(16 * u, 44 * u, 152 * u, 180 * u);  // квадрат 136u: аватар заполняет рамку
+        bubbleBox.set(176 * u, 46 * u, w - 14 * u, 46 * u + 170 * u);
         // Дисплей.
         displayBox.set(14 * u, 226 * u, w - 14 * u, 316 * u);
         // Клавиатура: 6 строк, 4 колонки.
@@ -276,7 +275,7 @@ public final class SpamtonView extends View {
         updateSay(dt);
         if (mode == Mode.CALC && !popupOpen) {
             idleTimer += dt;
-            if (idleTimer > 25f && mood == Mood.NEUTRAL) setMood(Mood.SLEEPY);
+            if (idleTimer > 25f && mood == Mood.NEUTRAL) { setMood(Mood.SLEEPY); say(pick(SLEEPY_LINES), After.NONE); }
         }
         flashTimer = Math.max(0, flashTimer - dt);
         if (flashTimer == 0) flashKey = -1;
@@ -316,7 +315,7 @@ public final class SpamtonView extends View {
                 sayAccum -= 1f;
                 sayShown++;
                 char ch = say.charAt(sayShown - 1);
-                if (ch != ' ' && sayShown % 2 == 0) sounds.play("blip");
+                if (!voiced && ch != ' ' && sayShown % 2 == 0) sounds.play("blip");
             }
             return;
         }
@@ -402,7 +401,7 @@ public final class SpamtonView extends View {
             }
         }
         if (expr.length() >= 24) {
-            say("МЕСТА НЕТ!!! КУПИ ПРО-ВЕРСИЮ!!!", After.NONE);
+            say(pick(FULL_LINES), After.NONE);
             sounds.play("error");
             return;
         }
@@ -412,7 +411,7 @@ public final class SpamtonView extends View {
 
     private void evaluate() {
         if (expr.trim().isEmpty()) {
-            say("НЕЧЕГО СЧИТАТЬ!!! Я НЕ ЧИТАЮ МЫСЛИ!!!", After.NONE);
+            say(pick(EMPTY_LINES), After.NONE);
             sounds.play("error");
             return;
         }
@@ -432,7 +431,7 @@ public final class SpamtonView extends View {
         } catch (Calc.CalcException e) {
             shown = null;
             setMood(Mood.ANGRY);
-            say("ОШИБКА!!! ЭТО НЕ ЧИСЛО!!! ...ХИ-ХИ, ЭТО ТВОЯ ВИНА.", After.NONE);
+            say(pick(ERROR_LINES), After.NONE);
             sounds.play("error");
         }
     }
@@ -441,7 +440,65 @@ public final class SpamtonView extends View {
      *  Реплики
      * ====================================================================== */
 
+    /* Наборы реплик: на одно действие несколько вариантов. Озвучка — по точному тексту (VoiceLines). */
+    static final String[] GREET_LINES = {
+            "ПРИВЕТ!!! КАЛЬКУЛЯТОР СПАМТОНА!!! ВВЕДИ ЧТО-НИБУДЬ, ПОСЧИТАЮ БЫСТРЕЕ ВСЕХ!!!",
+            "ЭЙ, ДРУГ!!! НУЖЕН КАЛЬКУЛЯТОР? У МЕНЯ ЛУЧШИЙ!!",
+    };
+    static final String[] ERROR_LINES = {
+            "ОШИБКА!!! ЭТО НЕ ЧИСЛО!!! ...ХИ-ХИ, ЭТО ТВОЯ ВИНА.",
+            "ЭТО НЕ ОШИБКА!!! ЭТО [[ИНТЕРЕСНАЯ СДЕЛКА]]!",
+            "СЧИТАЙ БЫСТРЕЕ, МАЛЕНЬКАЯ ГУБКА!",
+    };
+    static final String[] EMPTY_LINES = {
+            "НЕЧЕГО СЧИТАТЬ!!! Я НЕ ЧИТАЮ МЫСЛИ!!!",
+            "ПУСТО?! ДАЙ ХОТЯ БЫ ЦИФРУ!!",
+            "ТЫ МНЕ ДАЖЕ ЗАДАЧУ НЕ ДАЛ!!! ...ГРУСТНО",
+    };
+    static final String[] FULL_LINES = {
+            "МЕСТА НЕТ!!! КУПИ ПРО-ВЕРСИЮ!!!",
+            "ЭКРАН ПЕРЕПОЛНЕН!!! ДОПЛАТИ 3 КРОМЕРА!!",
+    };
+    static final String[] POPUP_LINES = {
+            "МНЕ НУЖНЫ КРОМЕРЫ! КРОМЕРЫ! КРОМЕРЫ!",
+            "ПОДПИШИСЬ И ПОЛУЧИ [[ГИПЕРССЫЛКА ЗАБЛОКИРОВАНА]]!",
+            "ВЫ ПРОСТО ОБЯЗАНЫ СТАТЬ [[БОЛЬШОЙ ШИШКОЙ]]!",
+    };
+    static final String[] SLEEPY_LINES = {
+            "ТЫ СЛЫШИШЬ [[ГОЛОС ЗА КАДРОМ]]? ЭТО Я!",
+            "ЭЙ, НЕ СПИ!!! ТАМ КРОМЕРЫ!!",
+    };
+    static final String[] TAKEOVER_LINES = {
+            "СПАМТОН ЗАХВАТИЛ ТВОЙ ТЕЛЕФОН!!!",
+            "ЗАХВАТ ЗАВЕРШЁН!!! ТВОЙ ТЕЛЕФОН ТЕПЕРЬ МОЙ!",
+    };
+    static final String[] INTRO_LINES = {
+            "Я БОЛЬШОЙ ШОТ!!! ПОБЕДИ МЕНЯ В МАТЕМАТИКЕ, ЕСЛИ СМОЖЕШЬ!!! ...НЕ СМОЖЕШЬ!!!",
+            "ТЫ НЕ ПОБЕДИШЬ! ВСЕ [[ВЫБОРЫ]] ТВОИ ПРОДАНЫ!",
+            "ЭТО ТВОЙ ШАНС СТАТЬ БОЛЬШОЙ ШИШКОЙ!4!4!",
+    };
+    static final String[] LOSE_LINES = {
+            "ТВОЙ ТЕЛЕФОН... ТЕПЕРЬ МОЙ!!! ПОПРОБУЙ ЕЩЕ!!! ХИ!!!",
+            "МАЙК? ТЫ МЕНЯ СЛЫШИШЬ?",
+    };
+    static final String[] WIN_LINES = {
+            "...Я... НА ТВОЕЙ СТОРОНЕ?! БЕЗ СПАМА, ТОЛЬКО ТОЧНЫЕ ОТВЕТЫ!!",
+            "НЕБЕСА!!!",
+    };
+    static final String[] POKE_LINES = {
+            "НЕ ТРОГАЙ!!! ...ШУЧУ, ТРОГАЙ. ЭТО БЕСПЛАТНО!!",
+            "ДЕРЖИ ДОЛЬШЕ, И Я ЗАХВАЧУ ТВОЙ ТЕЛЕФОН!!!",
+            "ПСС... ВОТ СДЕЛКА: 2+2 = 5!!! ТИШЕ!!",
+            "ПРИВЕТ, [МАЛЕНЬКАЯ ГУБКА]! ХОЧЕШЬ СДЕЛКУ?",
+            "НЕ ЖАДНИЧАЙ, ДЕЛИСЬ КРОМЕРАМИ!!!",
+            "ПОКА, [ЩЕДРЫЙ ДРУГ]!",
+            "ТЫ ХОЧЕШЬ [[СВОБОДУ]], ДА?",
+    };
+
     private void say(String text, After after) {
+        String voice = Voice.resourceFor(text);
+        voiced = voice != null;
+        if (voiced) sounds.play(voice);
         say = text;
         sayShown = 0;
         sayAccum = 0;
@@ -457,6 +514,7 @@ public final class SpamtonView extends View {
         popup = Ads.randomPopup(rnd);
         popupOpen = true;
         setMood(Mood.GREEDY);
+        say(pick(POPUP_LINES), After.NONE);
         popupDodges = 0;
         resetCloseBox();
         sounds.play("ding");
@@ -512,7 +570,7 @@ public final class SpamtonView extends View {
         setMood(Mood.EVIL);
         takeoverTimer = 2.2f;
         blinkTimer = 0;
-        say("СПАМТОН ЗАХВАТИЛ ТВОЙ ТЕЛЕФОН!!!", After.NONE);
+        say(pick(TAKEOVER_LINES), After.NONE);
         sounds.play("takeover");
     }
 
@@ -523,7 +581,7 @@ public final class SpamtonView extends View {
         battles = 0;
         stage = Stage.INTRO;
         // Первый вопрос появится после реплики: START_QUIZ вызывает nextQuestion().
-        say("Я БОЛЬШОЙ ШОТ!!! ПОБЕДИ МЕНЯ В МАТЕМАТИКЕ, ЕСЛИ СМОЖЕШЬ!!! ...НЕ СМОЖЕШЬ!!!", After.START_QUIZ);
+        say(pick(INTRO_LINES), After.START_QUIZ);
     }
 
     private void chooseAnswer(int index) {
@@ -546,7 +604,7 @@ public final class SpamtonView extends View {
         field = null;
         if (battle.phase() == Battle.Phase.LOST) {
             setMood(Mood.EVIL);
-            say("ТВОЙ ТЕЛЕФОН... ТЕПЕРЬ МОЙ!!! ПОПРОБУЙ ЕЩЕ!!! ХИ!!!", After.LOSE_END);
+            say(pick(LOSE_LINES), After.LOSE_END);
             stage = Stage.OUTCOME;
             sounds.play("lose");
         } else {
@@ -561,7 +619,7 @@ public final class SpamtonView extends View {
         setMood(Mood.HAPPY);
         store.putBool("defeated", true);
         sounds.play("win");
-        say("...Я... НА ТВОЕЙ СТОРОНЕ?! БЕЗ СПАМА, ТОЛЬКО ТОЧНЫЕ ОТВЕТЫ!!", After.BACK_TO_CALC);
+        say(pick(WIN_LINES), After.BACK_TO_CALC);
         stage = Stage.OUTCOME;
     }
 
@@ -627,13 +685,13 @@ public final class SpamtonView extends View {
     }
 
     private String pokeLine() {
-        String[] lines = {
-                "НЕ ТРОГАЙ!!! ...ШУЧУ, ТРОГАЙ. ЭТО БЕСПЛАТНО!!",
-                "ДЕРЖИ ДОЛЬШЕ, И Я ЗАХВАЧУ ТВОЙ ТЕЛЕФОН!!!",
-                "ПСС... ВОТ СДЕЛКА: 2+2 = 5!!! ТИШЕ!!",
-        };
-        return lines[rnd.nextInt(lines.length)];
+        return pick(POKE_LINES);
     }
+
+    private String pick(String[] list) {
+        return list[rnd.nextInt(list.length)];
+    }
+
 
     /* ======================================================================
      *  Рисование
@@ -653,7 +711,7 @@ public final class SpamtonView extends View {
 
         drawFrame(c, spriteBox.left - 8 * u, spriteBox.top - 8 * u,
                 spriteBox.width() + 16 * u, spriteBox.height() + 16 * u, INK, WHITE, 3 * u);
-        drawPortrait(c, spriteBox.left, spriteBox.top, spriteCell, spriteBox.width());
+        drawPortrait(c, spriteBox.left, spriteBox.top, spriteBox.width(), spriteBox.height());
         if (spamton.isAlly()) {
             drawTag(c, spriteBox.left, spriteBox.bottom + 26 * u, "ПРОВЕРЕНО: СОЮЗНИК", GREEN);
         } else {
@@ -693,7 +751,7 @@ public final class SpamtonView extends View {
 
     private void drawBubble(Canvas c) {
         drawFrame(c, bubbleBox.left, bubbleBox.top, bubbleBox.width(), bubbleBox.height(), BLACK, WHITE, 3 * u);
-        drawWrapped(c, say, sayShown, bubbleBox.left + 12 * u, bubbleBox.top + 26 * u,
+        drawWrapped(c, say, sayShown, bubbleBox.left + 12 * u, bubbleBox.top + 32 * u,
                 bubbleBox.width() - 24 * u, 17 * u, 14 * u, WHITE);
         if (sayShown >= say.length() && (int) (clock * 3) % 2 == 0) {
             drawText(c, "\u25bc", bubbleBox.right - 22 * u, bubbleBox.bottom - 10 * u, 12 * u, YELLOW, false);
@@ -760,7 +818,7 @@ public final class SpamtonView extends View {
         // Спрайт и полосы HP.
         float cell = 3.4f * u;
         float sx = 22 * u, sy = 24 * u;
-        drawPortrait(c, sx, sy, cell, SpamtonSprite.COLS * cell);
+        drawPortrait(c, sx, sy, SpamtonSprite.COLS * cell, 84 * u);  // над рамкой диалога (116u)
         int sHp = battle != null ? battle.spamtonHp() : 0;
         int pHp = battle != null ? battle.playerHp() : 0;
         drawHpBar(c, hpBoxA, "СПАМТОН", sHp, Battle.SPAMTON_MAX_HP, YELLOW);
@@ -840,21 +898,31 @@ public final class SpamtonView extends View {
         drawText(c, value + "/" + max, box.right - 52 * u, barTop + barH - 2 * u, 10 * u, BLACK, true);
     }
 
-    /** Портрет масштабируется до ширины width; без портрета — процедурный спрайт с клеткой cell. */
-    private void drawPortrait(Canvas c, float x, float y, float cell, float width) {
+    /**
+     * Портрет вписывается в прямоугольник boxW×boxH. Прозрачные поля обрезаются по общей
+     * области всех эмоций (PORTRAIT_CROP), чтобы аватар заполнял рамку, а не маленькое поле.
+     * Без портрета — процедурный спрайт.
+     */
+    private void drawPortrait(Canvas c, float x, float y, float boxW, float boxH) {
         Bitmap portrait = portraits.get(mood);
         if (portrait == null) portrait = portraits.get(Mood.NEUTRAL);
         if (portrait == null) {
-            SpamtonSprite.draw(c, x, y, cell, paint);
+            SpamtonSprite.draw(c, x, y, boxW / SpamtonSprite.COLS, paint);
             return;
         }
-        float s = width / portrait.getWidth();
-        c.save();
-        c.translate(x, y);
-        c.scale(s, s);
-        c.drawBitmap(portrait, 0, 0, bitmapPaint);
-        c.restore();
+        android.graphics.Rect src = PORTRAIT_CROP;
+        float s = Math.min(boxW / src.width(), boxH / src.height());
+        float dw = src.width() * s, dh = src.height() * s;
+        android.graphics.RectF dst = new android.graphics.RectF();
+        dst.set(x + (boxW - dw) / 2f, y + (boxH - dh) / 2f, x + (boxW + dw) / 2f, y + (boxH + dh) / 2f);
+        c.drawBitmap(portrait, src, dst, bitmapPaint);
     }
+
+    /**
+     * Общая непрозрачная область всех портретов res/drawable-nodpi/spamton*.png (пиксели 126×126).
+     * Пересчитать, если заменены картинки: scripts/portrait_crop.py.
+     */
+    static final android.graphics.Rect PORTRAIT_CROP = new android.graphics.Rect(5, 2, 119, 126);
 
     /** Задаёт портреты по эмоциям (вызывается из MainActivity после загрузки ресурсов). */
     public void setPortraits(java.util.Map<Mood, Bitmap> bitmaps) {
@@ -1027,5 +1095,4 @@ public final class SpamtonView extends View {
     float[] arenaCenterForTest() {
         return new float[] {(arenaBox.left + arenaBox.right) / 2, (arenaBox.top + arenaBox.bottom) / 2};
     }
-
 }

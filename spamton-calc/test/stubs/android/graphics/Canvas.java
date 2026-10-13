@@ -59,6 +59,14 @@ public class Canvas {
            .append(' ').append(bm.getWidth() * sx).append(' ').append(bm.getHeight() * sy).append('\n');
     }
 
+    /** Кусок битмапа src (пиксели) в прямоугольник dst (координаты холста). */
+    public void drawBitmap(Bitmap bm, Rect src, RectF dst, Paint p) {
+        ops.append("J ").append(bm.path).append(' ')
+           .append(src.left).append(' ').append(src.top).append(' ').append(src.right).append(' ').append(src.bottom).append(' ')
+           .append(tx + dst.left * sx).append(' ').append(ty + dst.top * sy).append(' ')
+           .append(tx + dst.right * sx).append(' ').append(ty + dst.bottom * sy).append('\n');
+    }
+
     public void clipRect(float l, float t, float r, float b) {
         ops.append("C ").append(tx + l * sx).append(' ').append(ty + t * sy).append(' ')
            .append(tx + r * sx).append(' ').append(ty + b * sy).append('\n');

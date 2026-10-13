@@ -78,6 +78,14 @@ def render(ops_path, png_path):
                 pic = Image.open(src_path).convert("RGBA")
                 pic = pic.resize((max(1, round(float(w))), max(1, round(float(h)))), Image.NEAREST)
                 img.paste(pic, (round(float(x)), round(float(y))), pic)
+            elif kind == "J":
+                # J путь sl st sr sb dl dt dr db: кусок картинки (пиксели) в прямоугольник назначения
+                path, sl, st, sr, sb, dl, dt, dr, db = rest.split()
+                pic = Image.open(os.path.join(BASE, path)).convert("RGBA")
+                pic = pic.crop((int(sl), int(st), int(sr), int(sb)))
+                dw, dh = max(1, round(float(dr) - float(dl))), max(1, round(float(db) - float(dt)))
+                pic = pic.resize((dw, dh), Image.LANCZOS)
+                img.paste(pic, (round(float(dl)), round(float(dt))), pic)
             elif kind == "C":
                 clip = tuple(float(v) for v in rest.split())
             elif kind == "S":

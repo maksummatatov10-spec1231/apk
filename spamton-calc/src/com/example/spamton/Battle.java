@@ -47,6 +47,21 @@ public final class Battle {
         }
     }
 
+    /** Реплики при верном ответе (Спамтон получает урон, но не побеждён). */
+    static final String[] HIT_LINES = {
+            "ХМ!! ПОВЕЗЛО!! ...НУ ЛАДНО, МОЙ ХОД!!",
+            "ПОЗДРАВЛЯЮ!!! ТЫ ВЫИГРАЛ [ВЕЧНУЮ ЖИЗНЬ]!",
+            "ОН ДЁРГАЕТ ЗА НИТИ И ЗАСТАВЛЯЕТ ИХ ЗВЕНЕТЬ",
+            "ЭЙ!! ТАК НЕЧЕСТНО!! ...НО ПРОДОЛЖАЙ!!",
+    };
+
+    /** Реплики при неверном ответе (Спамтон лечится). */
+    static final String[] HEAL_LINES = {
+            "НЕВЕРНО!!! МОЙ СПАМ СИЛЬНЕЕ!! ХИ-ХИ!!",
+            "ХИ-ХИ-ХИ! ВЫ ВЫБРАЛИ [[ЗАЧЁТ]]!",
+            "ОЙ, ОШИБОЧКА!! А Я ЛЕЧУСЬ, ХА!!",
+    };
+
     private final Random rnd;
     private int spamtonHp = SPAMTON_MAX_HP;
     private int playerHp = PLAYER_MAX_HP;
@@ -88,13 +103,13 @@ public final class Battle {
                 return new Outcome(true, dmg, 0, "НЕЕЕТ... МОЙ АККАУНТ... КАК?!");
             }
             phase = Phase.ATTACK;
-            return new Outcome(true, dmg, 0, "ХМ!! ПОВЕЗЛО!! ...НУ ЛАДНО, МОЙ ХОД!!");
+            return new Outcome(true, dmg, 0, pick(HIT_LINES));
         }
         streak = 0;
         int healed = Math.min(HEAL_ON_WRONG, SPAMTON_MAX_HP - spamtonHp);
         spamtonHp += healed;
         phase = Phase.ATTACK;
-        return new Outcome(false, 0, healed, "НЕВЕРНО!!! МОЙ СПАМ СИЛЬНЕЕ!! ХИ-ХИ!!");
+        return new Outcome(false, 0, healed, pick(HEAL_LINES));
     }
 
     /** Фаза уклонения окончена: списывает урон за попадания. */
@@ -146,5 +161,9 @@ public final class Battle {
     private static boolean contains(int[] arr, int n, int v) {
         for (int i = 0; i < n; i++) if (arr[i] == v) return true;
         return false;
+    }
+
+    private String pick(String[] list) {
+        return list[rnd.nextInt(list.length)];
     }
 }

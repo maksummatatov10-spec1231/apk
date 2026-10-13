@@ -17,7 +17,7 @@ APK-файлы приложений репозитория. Все подпис�
 66a9342dfee7fc25311be50cce97d92f36d101ba61203b96b7ac67712484b59a  AirHotkeyChallenge-v1.0.apk
 9b6b0a3df04ef33157e2815d8dc5ebef5ff1168cf2aebe600f460ec95825693b  CalcSolver-v1.1.apk
 337a533a4ef98d4126a08b2a9488098923c54c48351150c76b0dbc0e8a92207d  Hello-v1.0.apk
-a12410a04fb7480d947c210416c476cf622f5377776f83513bd138726fbedb76  Spamton-v1.0.apk
+0b589908b153f3046657723ed7a8be0e59cd2ec4e635eaa1ae880d692678dc38  Spamton-v1.0.apk
 ```
 
 Проверка: `sha256sum -c` в этой папке (или `sha256sum *.apk`, сравнить с таблицей).
