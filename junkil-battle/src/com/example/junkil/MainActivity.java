@@ -6,11 +6,18 @@ import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
 
-/** Точка входа: экран боя с Джанклимом и цикл кадров (~60 в секунду). */
+/** Точка входа: экран боя с Джанклимом (ландшафт, полноэкранный режим) и цикл кадров. */
 public class MainActivity extends Activity {
 
     private static final long FRAME_MS = 16L;
+    /** Бесшовные текстуры атак (порядок = индекс в ArenaSim.Item.tex). */
+    private static final String[] TEXTURES = {
+        "atk_static", "atk_circuit", "atk_dollar", "atk_chrome", "atk_bubbles",
+        "atk_vinyl", "atk_rust", "atk_cassette", "atk_stripes",
+    };
+
     private BattleView view;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastNs;
@@ -30,14 +37,30 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Bitmap[] sprites = new Bitmap[3];
-        String[] names = {"junkil", "junkil_angry", "junkil_sad"};
-        for (int i = 0; i < names.length; i++) {
-            int id = getResources().getIdentifier(names[i], "drawable", getPackageName());
-            if (id != 0) sprites[i] = BitmapFactory.decodeResource(getResources(), id);
-        }
-        view = new BattleView(this, sprites, System.currentTimeMillis());
+        Bitmap[] sprites = {load("junkil"), null, null};
+        Bitmap[] textures = new Bitmap[TEXTURES.length];
+        for (int i = 0; i < TEXTURES.length; i++) textures[i] = load(TEXTURES[i]);
+        view = new BattleView(this, sprites, textures, System.currentTimeMillis());
         setContentView(view);
+        hideSystemUi();
+    }
+
+    private Bitmap load(String name) {
+        int id = getResources().getIdentifier(name, "drawable", getPackageName());
+        return id == 0 ? null : BitmapFactory.decodeResource(getResources(), id);
+    }
+
+    private void hideSystemUi() {
+        view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) hideSystemUi();
     }
 
     @Override

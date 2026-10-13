@@ -112,13 +112,13 @@ public final class UiCheck {
         j.tapLogical(180, 400);
         float hx0 = j.view.sim.heartX;
         j.view.onTouchEvent(android.view.MotionEvent.obtain(android.view.MotionEvent.ACTION_DOWN,
-                BattleView.JOY_X * 2, 60 + BattleView.JOY_Y * 2));
+                j.pxX(BattleView.JOY_X), j.pxY(BattleView.JOY_Y)));
         j.view.onTouchEvent(android.view.MotionEvent.obtain(android.view.MotionEvent.ACTION_MOVE,
-                (BattleView.JOY_X + 25) * 2, 60 + BattleView.JOY_Y * 2));
+                j.pxX(BattleView.JOY_X + 25), j.pxY(BattleView.JOY_Y)));
         j.advance(0.5f);
         check("тяга джойстика вправо сдвигает сердце вправо", j.view.sim.heartX > hx0);
         j.view.onTouchEvent(android.view.MotionEvent.obtain(android.view.MotionEvent.ACTION_UP,
-                (BattleView.JOY_X + 25) * 2, 60 + BattleView.JOY_Y * 2));
+                j.pxX(BattleView.JOY_X + 25), j.pxY(BattleView.JOY_Y)));
         eq("отпускание сбрасывает стик", 0f, j.view.sim.stickX);
     }
 

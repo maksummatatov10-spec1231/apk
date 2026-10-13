@@ -13,7 +13,7 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-W, H = 720, 1440
+W, H = 1280, 720
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 _cache = {}

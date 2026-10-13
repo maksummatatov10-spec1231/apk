@@ -158,7 +158,7 @@ public final class LogicCheck {
 
         // Попадание: ставим сердце на предмет и делаем шаг.
         ArenaSim hit = new ArenaSim(new Random(5), BattleLogic.Pattern.NORMAL, "SOS");
-        hit.items.add(new ArenaSim.Item(ArenaSim.Kind.CAP, 150f, 100f, 0f, 0f, 6f));
+        hit.items.add(new ArenaSim.Item(ArenaSim.Kind.COIN, 0, 150f, 100f, 0f, 0f, 6f));
         hit.moveHeartTo(150f, 100f);
         eq("касание предмета засчитывает попадание", 1, hit.update(0.016f));
         eq("повторно тот же предмет не засчитывается", 0, hit.update(0.016f));

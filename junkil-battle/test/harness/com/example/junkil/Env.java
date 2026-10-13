@@ -5,23 +5,29 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.view.MotionEvent;
 
-/** Обвязка харнесса: вид 720×1440 (масштаб 2×, сверху-снизу поля 60 px). */
+/** Обвязка харнесса: ландшафт 1280×720; логические координаты 854×480 масштабируются как в BattleView. */
 final class Env {
 
-    static final int W = 720, H = 1440;
-    static final float SCALE = 2f, TOP = 60f;
+    static final int W = 1280, H = 720;
+    static final String[] TEX = {
+        "static", "circuit", "dollar", "chrome", "bubbles", "vinyl", "rust", "cassette", "stripes",
+    };
 
     final BattleView view;
 
     Env(long seed) {
-        Bitmap[] sprites = {
-            new Bitmap("res/drawable-nodpi/junkil.png", 290, 440),
-            new Bitmap("res/drawable-nodpi/junkil_angry.png", 290, 440),
-            new Bitmap("res/drawable-nodpi/junkil_sad.png", 290, 440),
-        };
-        view = new BattleView(new Context(), sprites, seed);
+        Bitmap[] sprites = {new Bitmap("res/drawable-nodpi/junkil.png", 290, 440), null, null};
+        Bitmap[] textures = new Bitmap[TEX.length];
+        for (int i = 0; i < TEX.length; i++) {
+            textures[i] = new Bitmap("res/drawable-nodpi/atk_" + TEX[i] + ".png", 512, 512);
+        }
+        view = new BattleView(new Context(), sprites, textures, seed);
         view.layout(0, 0, W, H);
     }
+
+    private float scale() { return Math.min(W / BattleView.LW, H / BattleView.LH); }
+    float pxX(float lx) { return (W - BattleView.LW * scale()) / 2f + lx * scale(); }
+    float pxY(float ly) { return (H - BattleView.LH * scale()) / 2f + ly * scale(); }
 
     String shot() {
         Canvas canvas = new Canvas();
@@ -31,7 +37,7 @@ final class Env {
 
     /** Касание в логических координатах (как пользователь на экране). */
     void tapLogical(float lx, float ly) {
-        float px = lx * SCALE, py = TOP + ly * SCALE;
+        float px = pxX(lx), py = pxY(ly);
         view.onTouchEvent(MotionEvent.obtain(MotionEvent.ACTION_DOWN, px, py));
         view.onTouchEvent(MotionEvent.obtain(MotionEvent.ACTION_UP, px, py));
     }
