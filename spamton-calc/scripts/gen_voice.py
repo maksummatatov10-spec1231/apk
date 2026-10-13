@@ -16,10 +16,7 @@ import random
 import struct
 import wave
 
-try:
-    import espeakng_loader as el
-except ImportError:  # нужен только движку eSpeak
-    el = None
+import espeakng_loader as el
 
 # (id, текст на экране, как произносить, помехи)
 PHRASES = [
@@ -69,84 +66,11 @@ PHRASES = [
      "Нееет... мой аккаунт... как?!", True),
     ("garantiya", "ВОТ ТВОЙ ОТВЕТ!! $$$ 100% ГАРАНТИЯ $$$",
      "Вот твой ответ! Сто процентов гарантия!", False),
-    # Реплики фазы атаки (бой): комментарии по ходу уклонения.
-    ("lovi", "ЛОВИ КРОМЕРЫ!!! ОНИ ЖЁЛТЫЕ, ОНИ ВКУСНЫЕ!!",
-     "Лови кромеры! Они жёлтые, они вкусные!", False),
-    ("uvorachivaysya", "УВОРАЧИВАЙСЯ, ЭТО БЕСПЛАТНО!!!",
-     "Уворачивайся, это бесплатно!", False),
-    ("skidka", "[[СКИДКА]] ДЕВЯНОСТО ПРОЦЕНТОВ!!! ТОЛЬКО СЕЙЧАС!!",
-     "Скидка девяносто процентов! Только сейчас!", False),
-    ("ne_sdavajsya", "НЕ СДАВАЙСЯ!!! ...ТО ЕСТЬ СДАВАЙСЯ, ПОЖАЛУЙСТА!!",
-     "Не сдавайся! То есть сдавайся, пожалуйста!", False),
-    ("tochno", "ЭТО ТОЧНО НЕ ПОДВОХ!!! ...ПОЧТИ",
-     "Это точно не подвох! Почти.", False),
-    ("bolno", "ОЙ!! ЭТО БЫЛО БОЛЬНО... ЗА ДЕНЬГИ!!",
-     "Ой! Это было больно... за деньги!", False),
-    ("podozhdi", "ПОДОЖДИ!! ТЫ ЖЕ МОЙ КЛИЕНТ!!",
-     "Подожди! Ты же мой клиент!", False),
-    ("popal", "ХА!! ПОПАЛ, ДРУГ!! ...НЕТ, Я ПОПАЛ!!",
-     "Ха! Попал, друг! Нет, я попал!", False),
-    ("moi_kromery", "МОИ КРОМЕРЫ!!! ОТДАЙ!!!",
-     "Мои кромеры! Отдай!", False),
-    ("zhadina", "ЖАДИНА!!! ТЫ ЖЕ ОТНИМАЕШЬ МОЮ ПРИБЫЛЬ!!",
-     "Жадина! Ты же отнимаешь мою прибыль!", False),
-    ("nechestno", "ЭЙ!! ТАК НЕЧЕСТНО!! ...НО ПРОДОЛЖАЙ!!",
-     "Эй! Так нечестно! Но продолжай!", False),
-    ("oshibochka", "ОЙ, ОШИБОЧКА!! А Я ЛЕЧУСЬ, ХА!!",
-     "Ой, ошибочка! А я лечусь, ха!", False),
-    ("povezlo", "ХМ!! ПОВЕЗЛО!! ...НУ ЛАДНО, МОЙ ХОД!!",
-     "Хм! Повезло! Ну ладно, мой ход!", False),
-    ("neverno", "НЕВЕРНО!!! МОЙ СПАМ СИЛЬНЕЕ!! ХИ-ХИ!!",
-     "Неверно! Мой спам сильнее! Хи-хи!", False),
-    ("bolshoy_shot", "Я БОЛЬШОЙ ШОТ!!! ПОБЕДИ МЕНЯ В МАТЕМАТИКЕ, ЕСЛИ СМОЖЕШЬ!!! ...НЕ СМОЖЕШЬ!!!",
-     "Я большой шот! Победи меня в математике, если сможешь! Не сможешь!", False),
-    ("lose_phone", "ТВОЙ ТЕЛЕФОН... ТЕПЕРЬ МОЙ!!! ПОПРОБУЙ ЕЩЕ!!! ХИ!!!",
-     "Твой телефон... теперь мой! Попробуй ещё! Хи!", False),
-    ("win_side", "...Я... НА ТВОЕЙ СТОРОНЕ?! БЕЗ СПАМА, ТОЛЬКО ТОЧНЫЕ ОТВЕТЫ!!",
-     "Я... на твоей стороне?! Без спама, только точные ответы!", False),
-    ("error_line", "ОШИБКА!!! ЭТО НЕ ЧИСЛО!!! ...ХИ-ХИ, ЭТО ТВОЯ ВИНА.",
-     "Ошибка! Это не число! Хи-хи, это твоя вина.", False),
-    ("takeover", "СПАМТОН ЗАХВАТИЛ ТВОЙ ТЕЛЕФОН!!!",
-     "Спамтон захватил твой телефон!", False),
 ]
 
 SR = 22050
 PITCH = 72     # выше обычного: тонкий голос
 RATE = 158     # слова в минуту
-
-
-class RhvSpeaker:
-    """Синтез RHVoice (русские голоса, HTS): тот же интерфейс, что у Speaker.
-
-    Голос выбирается переменной RHVOICE_VOICE (по умолчанию Aleksandr). Частота 24 кГц
-    пересчитывается в SR линейной интерполяцией.
-    """
-
-    def __init__(self, voice=None):
-        import rhvoice
-        self.rhv = rhvoice
-        self.engine = rhvoice.Engine()
-        self.voice = voice or os.environ.get("RHVOICE_VOICE", "Aleksandr")
-
-    def say(self, text):
-        # Скорость и тон через SynthParams в этой сборке не действуют (длительность не меняется),
-        # поэтому используются голоса как есть.
-        ok, sr, samples = self.engine.say(text, voice=self.voice)
-        if not ok or not samples:
-            raise SystemExit("RHVoice: синтез не удался: " + text)
-        x = [v / 32768.0 for v in samples]
-        if sr != SR:
-            ratio = sr / SR
-            n_out = int(len(x) / ratio)
-            out = []
-            for i in range(n_out):
-                pos = i * ratio
-                j = int(pos)
-                f = pos - j
-                b = x[j + 1] if j + 1 < len(x) else x[j]
-                out.append(x[j] + (b - x[j]) * f)
-            x = out
-        return x
 
 
 class Speaker:
@@ -257,19 +181,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="res/raw")
     ap.add_argument("--java", default="src/com/example/spamton/VoiceLines.java")
-    ap.add_argument("--engine", choices=["espeak", "rhvoice"], default="rhvoice",
-                    help="espeak — eSpeak NG (прежняя озвучка); rhvoice — RHVoice (по умолчанию)")
     args = ap.parse_args()
 
     entries = []
-    speaker = RhvSpeaker() if args.engine == "rhvoice" else Speaker()
+    speaker = Speaker()
     for idx, (pid, shown, speech, glitch_on) in enumerate(PHRASES):
         x = speaker.say(speech)
         if not x:
             raise SystemExit("пустой синтез: " + pid)
         x = normalize(x)
-        if args.engine == "espeak":
-            x = smooth(x)
+        x = smooth(x)
         if glitch_on:
             x = glitch(x, random.Random(1000 + idx))
         x = normalize(x, 0.8)
