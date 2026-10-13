@@ -195,12 +195,12 @@ final class ArenaSim {
                 return t + 0.6f;
             }
             case AIM: {
-                int shots = pattern == BattleLogic.Pattern.REDUCED ? 2 : (pattern == BattleLogic.Pattern.BOOSTED ? 5 : 3);
+                int shots = more(pattern == BattleLogic.Pattern.REDUCED ? 2 : (pattern == BattleLogic.Pattern.BOOSTED ? 5 : 3));
                 for (int i = 0; i < shots; i++) schedule.add(new Event(start + 0.3f + i * 0.6f, a, false, false));
                 return start + 0.3f + shots * 0.6f + 0.8f;
             }
             case WALL: {
-                int walls = pattern == BattleLogic.Pattern.REDUCED ? 2 : (pattern == BattleLogic.Pattern.BOOSTED ? 4 : 3);
+                int walls = more(pattern == BattleLogic.Pattern.REDUCED ? 2 : (pattern == BattleLogic.Pattern.BOOSTED ? 4 : 3));
                 for (int i = 0; i < walls; i++) schedule.add(new Event(start + 0.3f + i * 0.9f, a, false, false));
                 return start + 0.3f + walls * 0.9f + 1.0f;
             }
@@ -223,12 +223,23 @@ final class ArenaSim {
         }
     }
 
+    /** Скорость атак: на 50% быстрее, чем в v2.1 (умножение на 1.5 поверх режима). */
+    static final float SPEED_UP = 1.5f;
+    /** Количество фигур в атаках: на 40% больше, чем в v2.1. */
+    static final float COUNT_UP = 1.4f;
+
+    static int more(int base) {
+        return Math.round(base * COUNT_UP);
+    }
+
     float speedScale() {
+        float mode;
         switch (pattern) {
-            case REDUCED: return 0.75f;
-            case BOOSTED: return 1.25f;
-            default: return 1f;
+            case REDUCED: mode = 0.75f; break;
+            case BOOSTED: mode = 1.25f; break;
+            default: mode = 1f;
         }
+        return mode * SPEED_UP;
     }
 
     /** Атака, которая сейчас идёт (для подписи на арене). */
@@ -366,7 +377,7 @@ final class ArenaSim {
     private void spawnRing(float speed) {
         float cx = W / 2f, cy = H / 2f, R = 96f;
         float gapAngle = (float) Math.atan2(heartY - cy, heartX - cx);
-        int n = 12;
+        int n = more(12);
         for (int i = 0; i < n; i++) {
             double a = i * 2 * Math.PI / n;
             double diff = Math.abs(normalize(a - gapAngle));
@@ -387,7 +398,7 @@ final class ArenaSim {
 
     /** Монеты, отскакивающие от стен; живут 3 секунды. */
     private void spawnBounce(float speed) {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < more(3); i++) {
             float x = 20f + rng.nextFloat() * (W - 40f);
             float y = 20f + rng.nextFloat() * (H - 40f);
             double a = rng.nextFloat() * 2 * Math.PI;
