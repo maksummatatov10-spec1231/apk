@@ -450,10 +450,9 @@ final class BattleView extends View {
 
     private void drawArena(Canvas c) {
         frame(c, ARENA_L, ARENA_T, ARENA_R, ARENA_B, BORDER, 0xFF000000, 4);
-        text(c, arenaLabel(), AX + 5, AY + 13, 11, YELLOW, true, false);
         // снаряды не выходят за квадрат арены (падающие сверху появляются из-за рамки)
         c.save();
-        c.clipRect(ARENA_L + 4, ARENA_T + 4, ARENA_R - 4, ARENA_B - 4);
+        c.clipRect(X(ARENA_L + 4), Y(ARENA_T + 4), X(ARENA_R - 4), Y(ARENA_B - 4));
         for (ArenaSim.Item it : sim.items) {
             float px = AX + it.x, py = AY + it.y;
             switch (it.kind) {
@@ -469,6 +468,7 @@ final class BattleView extends View {
             }
         }
         c.restore();
+        text(c, arenaLabel(), AX + 5, AY + 13, 11, YELLOW, true, false);
         heart(c, AX + sim.heartX, AY + sim.heartY, 11f);
     }
 
