@@ -463,6 +463,8 @@ final class BattleView extends View {
                     rect(c, px - 6, py - 2, px + 6, py + 2, TEXT);
                     break;
                 default:
+                    // светлый контур под текстурой: тёмные текстуры не сливаются с чёрным полем
+                    drawShape(c, ArenaSim.polygon(it.kind), px, py, it.r + 1.5f, it.rot, -1, 0xFFE8E8F0);
                     drawShape(c, ArenaSim.polygon(it.kind), px, py, it.r, it.rot, it.tex, RED);
                     break;
             }

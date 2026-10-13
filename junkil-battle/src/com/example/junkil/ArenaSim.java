@@ -287,7 +287,7 @@ final class ArenaSim {
                 if (it.y > H - it.r) { it.y = H - it.r; it.vy = -Math.abs(it.vy); }
             }
             if (it.life >= 0) it.life -= dt;
-            if (!it.hit && dist(it.x, it.y, heartX, heartY) < it.r * 0.8f + HEART / 2f - 1f) {
+            if (!it.hit && dist(it.x, it.y, heartX, heartY) < it.r * 0.6f + HEART / 2f - 2f) {
                 it.hit = true;
                 hits++;
                 newHits++;

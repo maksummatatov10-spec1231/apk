@@ -144,6 +144,18 @@ public final class UiCheck {
         eq("арена после текста", BattleLogic.Phase.ARENA, e.logic().phase);
         e.advance(1.5f);
         check("на арене есть предметы", e.view.sim.items.size() > 0 || e.view.sim.spawned > 0);
+        // регрессия: обрезка арены должна быть в тех же координатах, что и фигуры (иначе снаряды невидимы)
+        boolean clipFound = false;
+        for (String line : e.shot().split("\n")) {
+            if (!line.startsWith("C ")) continue;
+            String[] p = line.split(" ");
+            float l = Float.parseFloat(p[1]), t = Float.parseFloat(p[2]);
+            float r = Float.parseFloat(p[3]), b = Float.parseFloat(p[4]);
+            clipFound = true;
+            check("обрезка арены шире 20% экрана (" + (r - l) + " px)", r - l > 0.2f * Env.W);
+            check("обрезка арены внутри экрана", l > 0 && t > 0 && r < Env.W && b < Env.H);
+        }
+        check("обрезка арены есть в кадре", clipFound);
         check("звук атаки (whoosh) играл", e.sounds.count("whoosh") > 0);
 
         // Урон сразу: фигура попадает в сердце — ХП игрока меняется в тот же кадр, арена не кончается
