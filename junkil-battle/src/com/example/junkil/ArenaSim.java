@@ -178,7 +178,8 @@ final class ArenaSim {
             order.addAll(java.util.Arrays.asList(forced));
         } else {
             order.add(Attack.MORSE);
-            List<Attack> rest = new ArrayList<>(List.of(Attack.AIM, Attack.WALL, Attack.RING, Attack.BOUNCE, Attack.DARK));
+            // ТЁМНЫЙ БАК в обычный пул не входит: только финальный залп (геноцид или милость)
+            List<Attack> rest = new ArrayList<>(List.of(Attack.AIM, Attack.WALL, Attack.RING, Attack.BOUNCE));
             Collections.shuffle(rest, rng);
             order.add(rest.get(0));
             order.add(rest.get(1));

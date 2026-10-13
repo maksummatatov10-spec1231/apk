@@ -171,7 +171,9 @@ final class BattleLogic {
     boolean mercy() {
         requireMenu();
         if (satisfy >= SATISFY_MAX) {
-            phase = Phase.SPARED;
+            // милость: сначала финальный залп «Тёмного бака», потом отпускает
+            finaleOutcome = Phase.SPARED;
+            phase = Phase.ARENA;
             line = Phrases.SPARED;
             return true;
         }
@@ -182,15 +184,23 @@ final class BattleLogic {
     /** Конец текста Джанклима: либо победа (HP 0), либо арена. Возвращает тип атаки или null. */
     Pattern startArena() {
         if (phase != Phase.JUNK_TALK) throw new IllegalStateException("не фаза JUNK_TALK: " + phase);
-        if (junkHp <= 0) {
-            phase = Phase.WON;
-            line = Phrases.WON;
-            return null;
-        }
         phase = Phase.ARENA;
+        if (junkHp <= 0) {
+            // геноцид: сначала финальный залп «Тёмного бака», потом победа
+            finaleOutcome = Phase.WON;
+            return Pattern.NORMAL;
+        }
         Pattern p = nextPattern;
         nextPattern = Pattern.NORMAL;
         return p;
+    }
+
+    /** Исход, который наступит после финального залпа «Тёмного бака» (WON или SPARED), иначе null. */
+    private Phase finaleOutcome;
+
+    /** Идёт финальный залп перед концовкой. */
+    boolean isFinale() {
+        return finaleOutcome != null;
     }
 
     /** Попадание на арене: урон игроку применяется сразу, в момент касания. */
@@ -205,6 +215,13 @@ final class BattleLogic {
         if (playerHp <= 0) {
             phase = Phase.LOST;
             line = Phrases.LOST;
+            finaleOutcome = null;
+            return;
+        }
+        if (finaleOutcome != null) {
+            phase = finaleOutcome;
+            finaleOutcome = null;
+            line = phase == Phase.WON ? Phrases.WON : Phrases.SPARED;
             return;
         }
         turn++;

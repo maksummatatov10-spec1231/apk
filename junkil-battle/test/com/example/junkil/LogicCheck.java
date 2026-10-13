@@ -115,15 +115,22 @@ public final class LogicCheck {
         eq("после отказа фаза MENU", BattleLogic.Phase.MENU, b.phase);
         b.satisfy = 100;
         eq("МИЛОСТЬ при 100% проходит", true, b.mercy());
-        eq("фаза SPARED", BattleLogic.Phase.SPARED, b.phase);
+        eq("перед милостью финал: фаза ARENA", BattleLogic.Phase.ARENA, b.phase);
+        check("финальный залп «Тёмного бака» идёт", b.isFinale());
+        check("бой ещё не окончен до залпа", !b.isOver());
+        b.endArena();
+        eq("после залпа фаза SPARED", BattleLogic.Phase.SPARED, b.phase);
         check("конец боя SPARED", b.isOver());
 
         b = new BattleLogic(new Random(8));
         b.junkHp = 4;
         b.chooseFight();
         b.fight(1.0);
-        eq("ХП 0 — Джанкил побеждён", null, b.startArena());
-        eq("фаза WON", BattleLogic.Phase.WON, b.phase);
+        eq("ХП 0 — сначала финал (обычный пул не нужен)", BattleLogic.Pattern.NORMAL, b.startArena());
+        eq("геноцид: фаза ARENA", BattleLogic.Phase.ARENA, b.phase);
+        check("геноцид: идёт финальный залп", b.isFinale());
+        b.endArena();
+        eq("после залпа фаза WON", BattleLogic.Phase.WON, b.phase);
 
         b = new BattleLogic(new Random(9));
         b.chooseFight();
@@ -199,14 +206,14 @@ public final class LogicCheck {
 
     /** «Тёмный бак»: залпы, подсказки, крышка и свет. */
     static void darkBin() {
-        // входит в обычный пул атак (за 60 ходов встречается хотя бы раз)
+        // в обычных ходах не выпадает: только финальный залп (геноцид или милость)
         boolean seen = false;
         for (long seed = 1; seed <= 60 && !seen; seed++) {
             ArenaSim s = new ArenaSim(new Random(seed), BattleLogic.Pattern.NORMAL, "SOS");
             run(s);
             seen = s.attackLog.contains(ArenaSim.Attack.DARK);
         }
-        check("ТЁМНЫЙ БАК есть в пуле атак", seen);
+        check("ТЁМНЫЙ БАК не выпадает в обычных ходах", !seen);
 
         // два залпа по три: шесть подсказок и шесть выстрелов, ход заканчивается по времени
         ArenaSim d = new ArenaSim(new Random(5), BattleLogic.Pattern.NORMAL, "SOS",

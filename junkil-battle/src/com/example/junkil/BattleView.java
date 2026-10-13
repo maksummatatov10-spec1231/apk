@@ -698,8 +698,13 @@ final class BattleView extends View {
                 setSub(SUB_NONE);
                 break;
             case "MERCY":
-                if (logic.mercy()) sounds.play("mercy");
-                else sounds.play("back");
+                if (logic.mercy()) {
+                    sounds.play("mercy");
+                    setSub(SUB_NONE);
+                    startArenaSim(BattleLogic.Pattern.NORMAL);
+                } else {
+                    sounds.play("back");
+                }
                 break;
             case "LOOK":
                 logic.chooseAct(BattleLogic.Act.LOOK);
@@ -744,11 +749,13 @@ final class BattleView extends View {
 
     private void continueTalk() {
         BattleLogic.Pattern p = logic.startArena();
-        if (p == null) {                      // победа: экран конца
-            sounds.play("win");
-            return;
-        }
-        sim = new ArenaSim(rng, p, logic.morseWord);
+        startArenaSim(p);
+    }
+
+    /** Арена хода; в финале (геноцид или милость) идёт только «Тёмный бак». */
+    private void startArenaSim(BattleLogic.Pattern p) {
+        ArenaSim.Attack[] forced = logic.isFinale() ? new ArenaSim.Attack[] {ArenaSim.Attack.DARK} : null;
+        sim = new ArenaSim(rng, p, logic.morseWord, forced);
         lastAttackStarts = 0;
     }
 
@@ -764,6 +771,7 @@ final class BattleView extends View {
         joyX = 0f;
         joyY = 0f;
         if (logic.phase == BattleLogic.Phase.LOST) sounds.play("lose");
+        if (logic.phase == BattleLogic.Phase.WON) sounds.play("win");
     }
 
     private void restart() {

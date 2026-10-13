@@ -221,7 +221,9 @@ public final class UiCheck {
         w.advance(0.5555f);
         w.tapLogical(400, 384);
         w.tapLogical(400, 400);
-        eq("ХП Джанкила 0 — победа", BattleLogic.Phase.WON, w.logic().phase);
+        eq("ХП Джанкила 0 — финал «Тёмный бак»", BattleLogic.Phase.ARENA, w.logic().phase);
+        w.advance(15f);   // залп проходит, потом победа
+        eq("ХП Джанкила 0 — победа после залпа", BattleLogic.Phase.WON, w.logic().phase);
         check("победа — конец", w.logic().isOver());
         w.tapLogical(400, 300);
         eq("тап после конца — новая игра", BattleLogic.Phase.MENU, w.logic().phase);
@@ -230,7 +232,9 @@ public final class UiCheck {
         Env s = new Env(29);
         s.logic().satisfy = 100;
         s.tapButton("MERCY");
-        eq("МИЛОСТЬ при 100 — SPARED", BattleLogic.Phase.SPARED, s.logic().phase);
+        eq("МИЛОСТЬ при 100 — финал «Тёмный бак»", BattleLogic.Phase.ARENA, s.logic().phase);
+        s.advance(15f);
+        eq("МИЛОСТЬ при 100 — SPARED после залпа", BattleLogic.Phase.SPARED, s.logic().phase);
         eq("мирный конец — спрайт обычный", BattleLogic.Mood.NORMAL, s.logic().mood());
 
         Env l = new Env(30);
