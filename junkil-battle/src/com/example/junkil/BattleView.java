@@ -470,22 +470,7 @@ final class BattleView extends View {
             }
         }
         c.restore();
-        text(c, arenaLabel(), AX + 5, AY + 13, 11, YELLOW, true, false);
         heart(c, AX + sim.heartX, AY + sim.heartY, 11f);
-    }
-
-    /** Короткая подпись текущей атаки (что сейчас летит). */
-    private String arenaLabel() {
-        ArenaSim.Attack a = sim.currentAttack();
-        if (a == null) return "";
-        switch (a) {
-            case MORSE: return "ЧАСТОТА: ТОЧКИ-ИГЛЫ";
-            case AIM: return "ПРИЦЕЛ: ДВИГАЙСЯ";
-            case WALL: return "СТЕНА: ИЩИ ДЫРУ";
-            case RING: return "КАРУСЕЛЬ: ИЩИ ЩЕЛЬ";
-            case BOUNCE: return "ОТСКОК";
-            default: return "";
-        }
     }
 
     private void drawPlayer(Canvas c) {
