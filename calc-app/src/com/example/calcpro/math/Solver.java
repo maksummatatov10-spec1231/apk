@@ -42,10 +42,11 @@ public final class Solver {
             if (!p.trim().isEmpty()) parts.add(p.trim());
         }
         if (parts.size() >= 2) return solveSystem(parts);
-        if (s.indexOf('=') >= 0 && s.indexOf('y') >= 0) return solveSystem(parts);
         if (s.indexOf('=') >= 0) {
+            // сначала запись графика («y = x² − 2x»), потом уравнения с y или z
             Matcher m = GRAPH_FORM.matcher(s);
             if (m.matches()) return solveGraphForm(m.group(1));
+            if (s.indexOf('y') >= 0 || s.indexOf('z') >= 0) return solveSystem(parts);
             return solveEquation(s);
         }
         return solveExpression(s);
@@ -189,7 +190,8 @@ public final class Solver {
             return r;
         }
         if (!(vars.size() == 1 && vars.contains("x"))) {
-            throw new MathError("Уравнение с одной переменной решаю для x. Для нескольких переменных используйте систему (с новой строкой или «;»)");
+            // несколько переменных (или не x): решаем как систему из одного уравнения
+            return solveSystem(Collections.singletonList(s));
         }
 
         Node f = Node.bin("-", left, right);
@@ -773,23 +775,32 @@ public final class Solver {
         int n = vars.size();
         int m = fs.size();
         if (n == 0) throw new MathError("В системе нет переменных");
-
-        r.steps.add("Исходная система:");
-        for (String line : lines) r.steps.add("   " + line);
+        // одно уравнение с одной переменной (не x), например y² = 4: переименуем в x и решаем как уравнение
+        if (m == 1 && n == 1 && !"x".equals(vars.get(0))) {
+            return solveEquation(eqs.get(0).replace(vars.get(0), "x"));
+        }
 
         Rational[][] a = new Rational[m][n];
         Rational[] b = new Rational[m];
+        boolean linear = true;
+        rows:
         for (int i = 0; i < m; i++) {
             Node f = fs.get(i);
             Map<String, Rational> zero = new HashMap<>();
             for (String v : vars) zero.put(v, Rational.ZERO);
             Rational c0 = f.exact(zero);
-            if (c0 == null) throw new MathError("Система должна быть линейной с рациональными коэффициентами");
+            if (c0 == null) {
+                linear = false;
+                break;
+            }
             for (int j = 0; j < n; j++) {
                 Map<String, Rational> unit = new HashMap<>(zero);
                 unit.put(vars.get(j), Rational.ONE);
                 Rational v1 = f.exact(unit);
-                if (v1 == null) throw new MathError("Система должна быть линейной с рациональными коэффициентами");
+                if (v1 == null) {
+                    linear = false;
+                    break rows;
+                }
                 a[i][j] = v1.sub(c0);
             }
             // проверка линейности: подставляем точку (2, 3, 5, ...)
@@ -801,9 +812,20 @@ public final class Solver {
                 expect = expect.add(a[i][j].mul(tv));
             }
             Rational got = f.exact(test);
-            if (got == null || !got.equals(expect)) throw new MathError("Пока решаю только линейные системы");
+            if (got == null || !got.equals(expect)) {
+                linear = false;
+                break;
+            }
             b[i] = c0.neg();
         }
+        if (!linear) {
+            // нелинейное уравнение или система: многочлены нескольких переменных и численный поиск
+            Multi.solve(fs, vars, lines, r);
+            return r;
+        }
+
+        r.steps.add("Исходная система:");
+        for (String line : lines) r.steps.add("   " + line);
 
         r.steps.add("Приводим к виду a·x + b·y + … = c:");
         for (int i = 0; i < m; i++) r.steps.add("   " + rowText(a[i], vars) + " = " + Fmt.rat(b[i]));

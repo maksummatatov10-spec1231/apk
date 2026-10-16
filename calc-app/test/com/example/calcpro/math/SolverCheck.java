@@ -114,10 +114,23 @@ public final class SolverCheck {
         expectAnswer("x + y + z = 1; x − z = 0", "y = 1 − 2·z");
         expectAnswer("x + y = 4", "x = 4 − y");
 
+        System.out.println("Многомерные уравнения и нелинейные системы:");
+        expectAnswer("5x×9y=91xy", "x = 0 или y = 0");
+        expectAnswer("x*y = 0", "x = 0 или y = 0");
+        expectAnswer("x*y = 3", "x = 3/y");
+        expectAnswer("x*y = 3", "y ≠ 0");
+        expectAnswer("x*y + y = 4", "x = (−y + 4)/y");
+        expectAnswer("x^2 - y = 4", "y = x² − 4");
+        expectAnswer("x^2 + y^2 = 25; x − y = 1", "x = 4, y = 3");
+        expectAnswer("x^2 + y^2 = 25; x − y = 1", "x = −3, y = −4");
+        expectAnswer("x*y = 6; x + y = 5", "x = 2, y = 3");
+        expectAnswer("x^2 + y^2 = -1", "не найдено");
+        expectAnswer("x + y = 3; x − y = 1", "x = 2");
+        expectAnswer("y^2 = 4", "x₁ = −2");
+
         System.out.println("Ошибки ввода:");
         expectError("x = 1 = 2");
         expectError("2 + ");
-        expectError("x*y = 3");
         expectError("3 @ 4");
 
         System.out.println();
